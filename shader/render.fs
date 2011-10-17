@@ -6,8 +6,11 @@ precision highp float;
 #define EPS     0.0001
 #define PI      3.14159265
 #define HALFPI  1.57079633
+#define HUGE_VAL	1000000000.0
 
-/* SHAPE */
+///////////////////////////////////////////////////////////
+// SHAPE 
+///////////////////////////////////////////////////////////
 struct Shape {  
   bool geometry;
   vec3 pos;
@@ -17,116 +20,116 @@ struct Shape {
 Shape newSphere() {
   return Shape(false, vec3(0.0), 0.5, vec3(0.5, 0.5, 0.5));
 }
+Shape newSphere(vec3 p, float r, vec3 c) {
+	Shape s = Shape(false, p, r, c);
+  return s;
+}
 Shape newCube() {
   return Shape(true, vec3(0.0), 0.5, vec3(0.5, 0.5, 0.5));
 }
-bool intersect(Shape s, vec3 P, vec3 V,
-  out float t, out vec3 normal, out vec3 color) {
+Shape newCube(vec3 p, float r, vec3 c) {
+	Shape s = Shape(true, p, r, c);
+  return s;
+}
+bool intersect(Shape s, vec3 P, vec3 V, out float t) {
   
   vec3 dist = P-s.pos;
   
   if (!s.geometry) {
     float A = dot(V,V);
-    float B = 2.0 * dot(V,dist);    
+    float B = 2.0 * dot(dist,V);    
     float C = dot(dist,dist) - s.radius*s.radius;
     
     float d = B*B - 4.0*A*C;  // discriminant
     if (d < 0.0) return false;
     
     d = sqrt(d);
-    float t = (-B-d)/(2.0*A);
+    t = (-B-d)/(2.0*A);
     if (t > 0.0) {
-      normal = (P+V*t-s.pos)/s.radius;
-      color = s.color;
       return true;
     }
     
     t = (-B+d)/(2.0*A);
     if (t > 0.0) {
-      normal = (P+V*t-s.pos)/s.radius;
-      color = s.color;
       return true;
     }
     
     return false;
   }
   else {
-    return false;
+    vec3 bMin = s.pos - vec3(s.radius);
+		vec3 bMax = s.pos + vec3(s.radius);
+		
+		vec3 tMin = (bMin-P) / V;
+		vec3 tMax = (bMax-P) / V;
+		vec3 t1 = min(tMin, tMax);
+		vec3 t2 = max(tMin, tMax);
+		float tNear = max(max(t1.x, t1.y), t1.z);
+		float tFar = min(min(t2.x, t2.y), t2.z);
+		
+		if (tNear<tFar && tFar>0.0) {
+			t = tNear>0.0 ? tNear : tFar;
+			return true;
+		}
+		
+		return false;
   }
 }
+vec3 getNormal(Shape s, vec3 hit) {
+	if (!s.geometry) {
+		return (hit-s.pos)/s.radius;
+	}
+	else {
+		vec3 p = hit-s.pos;
+		if 			(p.x < -s.radius+EPS) return vec3(-1.0, 0.0, 0.0);
+		else if (p.x >  s.radius-EPS) return vec3( 1.0, 0.0, 0.0);
+		else if (p.y < -s.radius+EPS) return vec3(0.0, -1.0, 0.0);
+		else if (p.y >  s.radius-EPS) return vec3(0.0,  1.0, 0.0);
+		else if (p.z < -s.radius+EPS) return vec3(0.0, 0.0, -1.0);
+		else return vec3(0.0, 0.0, 1.0);
+	}
+}
 
-/* GLOBALS */
+///////////////////////////////////////////////////////////
+// GLOBALS 
+///////////////////////////////////////////////////////////
 varying vec2 vUv;
 
 uniform vec3 camCenter;
 uniform vec3 camPos;
 uniform vec3 camUp;
 
-const vec3 lightDir = vec3(0.577350269, 0.577350269, -0.577350269);
-vec3 sphere[3];
-Shape shapes[3];
+const vec3 LIGHT_P = vec3(500.0, 1000.0, 800.0);
+const float LIGHT_I = 1.0;
+const float SPEC = 30.0;
+const float REFL = 0.5;
+const float Kr = 0.4;
+const float Ka = 0.3;
+const float Kt = 0.9;
+float Ks, Kd;
 
+const int SHAPE_NUM = 3;
+Shape shapes[SHAPE_NUM];
 
+///////////////////////////////////////////////////////////
+// INTERSECTIONS 
+///////////////////////////////////////////////////////////
 
-bool intersectSphere(vec3 center, vec3 lStart, vec3 lDir,
-                     out float dist) {
-  vec3 c = center - lStart;
-  float b = dot(lDir, c);
-  float d = b*b - dot(c, c) + 1.0;
-  if (d < 0.0) {
-    dist = 10000.0;
-    return false;
-  }
-
-  dist = b - sqrt(d);
-  if (dist < 0.0) {
-    dist = 10000.0;
-    return false;
-  }
-
-  return true;
+vec3 computeLight(vec3 V, vec3 P, vec3 N, vec3 color) {
+  vec3 L = normalize(LIGHT_P-P);
+  vec3 R = reflect(L, N);
+  
+  return
+    color*(Ka + Kd*LIGHT_I*dot(L, N)) +
+    vec3(Ks*LIGHT_I*pow(max(dot(R, V), 0.0), SPEC));
 }
 
-vec3 lightAt(vec3 N, vec3 V, vec3 color) {
-  vec3 L = lightDir;
-  vec3 R = reflect(-L, N);
-
-  float c = 0.3 + 0.4 * pow(max(dot(R, V), 0.0), 30.0) + 0.7 * dot(L, N);
-
-  if (c > 1.0) {
-    return mix(color, vec3(1.6, 1.6, 1.6), c - 1.0);
-  }
-
-  return c * color;
-}
-
-bool intersectWorld(vec3 lStart, vec3 lDir, out vec3 pos,
-                    out vec3 normal, out vec3 color) {
-  float d1, d2, d3;
-  bool h1, h2, h3;
-
-  h1 = intersectSphere(sphere[0], lStart, lDir, d1);
-  h2 = intersectSphere(sphere[1], lStart, lDir, d2);
-  h3 = intersectSphere(sphere[2], lStart, lDir, d3);
-
-  if (h1 && d1 < d2 && d1 < d3) {
-    pos = lStart + d1 * lDir;
-    normal = pos - sphere[0];
-    color = vec3(0.0, 0.0, 0.9);
-  }
-  else if (h2 && d2 < d3) {
-    pos = lStart + d2 * lDir;
-    normal = pos - sphere[1];
-    color = vec3(0.9, 0.0, 0.0);
-  }
-  else if (h3) {
-    pos = lStart + d3 * lDir;
-    normal = pos - sphere[2];
-    color = vec3(0.0, 0.9, 0.0);
-  }
-  else if (lDir.y < -0.01) {
-    pos = lStart + ((lStart.y + 2.7) / -lDir.y) * lDir;
-    if (pos.x*pos.x + pos.z*pos.z > 30.0) {
+bool intersectRoom(vec3 P, vec3 V,
+  out vec3 pos, out vec3 normal, out vec3 color) {
+  
+  if (V.y < -0.01) {
+    pos = P + ((P.y + 2.7) / -V.y) * V;
+    if (abs(pos.x) > 5.0 || abs(pos.z) > 5.0) {
       return false;
     }
     normal = vec3(0.0, 1.0, 0.0);
@@ -136,23 +139,54 @@ bool intersectWorld(vec3 lStart, vec3 lDir, out vec3 pos,
     else {
       color = vec3(0.0);
     }
+    return true;
   }
-  else {
-   return false;
-  }
+  return false;
+}
 
-  return true;
+bool intersectWorld(vec3 P, vec3 V,
+  out vec3 pos, out vec3 normal, out vec3 color) {
+  
+  float t_min = HUGE_VAL;
+  
+  float t;
+	Shape s;
+	bool hit = false;
+  vec3 n, c;
+  for (int i=0; i<SHAPE_NUM; i++) {
+    if (intersect(shapes[i],P,V,t) && t<t_min) {
+      t_min=t;
+			hit = true;
+			s = shapes[i];
+    }
+  }
+  
+  if (hit) {
+    pos = P+V*t_min;
+		normal = getNormal(s, pos);
+		color = s.color;
+    return true;
+  }
+  
+  return intersectRoom(P,V,pos,normal,color);
+}
+
+///////////////////////////////////////////////////////////
+// MAIN 
+///////////////////////////////////////////////////////////
+
+void initScene() {
+	shapes[0] = newSphere(vec3(0.0, 0.0, 0.0),  1.2, vec3(0.0, 0.0, 0.9));
+  shapes[1] = newCube(vec3(2.5, -1.0, 1.5), 1.0, vec3(0.9, 0.0, 0.0));
+  shapes[2] = newSphere(vec3(-1.5, 0.5, 2.0), .8, vec3(0.0, 0.9, 0.0));
 }
 
 void main(void)
 {
-  sphere[0] = vec3(0.0);
-  sphere[1] = vec3(2.0, -1.0, 0.5);
-  sphere[2] = vec3(-1.5, 0.5, 2.0);
-  
-  // shapes[0] = Shape(false, vec3(0.0, 0.0, 0.0), 0.5, vec3(0.0, 0.0, 0.9));
-  // shapes[1] = Shape(false, vec3(2.0, -1.0, 0.5), 0.5, vec3(0.9, 0.0, 0.0));
-  // shapes[2] = Shape(false, vec3(-1.5, 0.5, 2.0), 0.5, vec3(0.0, 0.9, 0.0));
+  Ks = (1.0-Ka)*REFL;
+  Kd = (1.0-Ka)*(1.0-REFL);
+	
+  initScene();
   
   /* RAY TRACE */
   vec3 C = normalize(camCenter-camPos);
@@ -165,21 +199,22 @@ void main(void)
   vec3 p1, norm, p2;
   vec3 col, colT, colM, col3;
   if (intersectWorld(camPos, R1, p1, norm, colT)) {
-   col = lightAt(norm, -R1, colT);
-   colM = (colT + vec3(0.7)) / 1.7;
-   R1 = reflect(R1, norm);
-   if (intersectWorld(p1, R1, p2, norm, colT)) {
-     col += lightAt(norm, -R1, colT) * colM;
-     colM *= (colT + vec3(0.7)) / 1.7;
-     R1 = reflect(R1, norm);
-     if (intersectWorld(p2, R1, p1, norm, colT)) {
-       col += lightAt(norm, -R1, colT) * colM;
-     }
-   }
+		col = computeLight(R1, p1, norm, colT);
+		// colM = (colT + vec3(0.7)) / 1.7;
+		
+		// R1 = reflect(R1, norm);
+		// if (intersectWorld(p1+2.0*EPS*R1, R1, p2, norm, colT)) {
+			// col += computeLight(R1, p2, norm, colT) * colM;
+			// colM *= (colT + vec3(0.7)) / 1.7;
+			// R1 = reflect(R1, norm);
+			// if (intersectWorld(p2+2.0*EPS*R1, R1, p1, norm, colT)) {
+			 // col += computeLight(R1, p1, norm, colT) * colM;
+			// }
+		// }
   
-   gl_FragColor = vec4(col, 1.0);
+    gl_FragColor = vec4(col, 1.0);
   }
   else {
-   gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
   }
 }
