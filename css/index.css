@@ -1,0 +1,39 @@
+body {
+  font-family:'Lucida Grande',Verdana,Helvetica,sans-serif;
+	font-size:12px;
+	line-height:150%;
+  
+  background-color:#999999;
+}
+
+.shadow {
+	-moz-box-shadow:    0px 3px 15px #000;
+	-webkit-box-shadow: 0px 3px 15px #000;
+	box-shadow:         0px 3px 15px #000;
+}
+
+p {
+	margin-bottom: 15px;
+}
+
+div#webgl-container {
+  margin: auto;
+  width: 400px;
+	height: 400px;
+  
+  margin-top:30px;
+  
+  background-color:#000000;
+}
+
+div#content-container {
+	margin: auto;
+	width: 800px;
+	
+	margin-top: 30px;
+}
+
+div#disclaimer {
+	margin-top:30px;
+	font-size:10px;
+}

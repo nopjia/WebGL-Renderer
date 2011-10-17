@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>WebGL</title>
+  
+  <meta name="description" content="WebGL Global Illumination Renderer">
+  <meta name="author" content="Nop Jiarathanakul">
+  <meta name="keywords" content="">
+
+  <link rel="stylesheet" href="css/reset.css" type="text/css">
+  <link rel="stylesheet" href="css/index.css" type="text/css">
+
+  <script type="text/javascript" src="js/jquery.min.js"></script>
+  <script type="text/javascript" src="js/Three.js"></script>
+  <script type="text/javascript" src="js/RequestAnimFrame.js"></script>
+  <script type="text/javascript" src="js/index.js"></script>
+</head>
+
+<body>
+  <div id="webgl-container" class="shadow"></div>
+  
+  <div id="content-container">
+    <p id="cam_pos"></p>
+    <p id="cam_up"></p>
+    <p id="pout"></p>
+    
+    <div id="disclaimer">
+      <p>Base ray tracer code from 
+        <a href="http://people.mozilla.com/~sicking/webgl/ray.html">Jonas Sicking</a>
+      </p>
+    </div>
+    
+  </div>
+
+  <!-- SHADERS -->  
+  <script type="x-shader/x-vertex" id="vertexshader">
+    #ifdef GL_ES
+    precision highp float;
+    #endif
+    
+    varying vec2 vUv;
+    
+    void main()
+    {
+      vUv = uv;
+      gl_Position = projectionMatrix *
+                    modelViewMatrix *
+                    vec4(position,1.0);
+    } 
+  </script>
+  
+  <script type="x-shader/x-fragment" id="fragmentshader"></script>
+
+</body>
+</html>
