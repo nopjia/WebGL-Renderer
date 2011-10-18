@@ -75,7 +75,7 @@ function initGL() {
   
   // camera for raytracing
   gCamera2 = new THREE.TrackballCamera({
-    fov: 45, 
+    fov: 30, 
     aspect: WIDTH / HEIGHT,
     near: 1,
     far: 1e3,
@@ -90,7 +90,7 @@ function initGL() {
     noZoom: false,
     noPan: false
   });
-  gCamera2.position.z = 5;
+  gCamera2.position.z = 10;
   
   // setup scene, for rendering
   gScene = new THREE.Scene();

@@ -6,7 +6,9 @@ precision highp float;
 #define EPS     0.0001
 #define PI      3.14159265
 #define HALFPI  1.57079633
+#define ROOTTHREE 0.57735027
 #define HUGE_VAL	1000000000.0
+
 
 ///////////////////////////////////////////////////////////
 // SHAPE 
@@ -99,13 +101,14 @@ uniform vec3 camCenter;
 uniform vec3 camPos;
 uniform vec3 camUp;
 
-const vec3 LIGHT_P = vec3(500.0, 1000.0, 800.0);
+const vec3 ROOM_DIM = vec3(5.0, 5.0, 5.0);
+const vec3 LIGHT_P = vec3(0.0, 5.0, 0.0);
 const float LIGHT_I = 1.0;
 const float SPEC = 30.0;
 const float REFL = 0.5;
-const float Kr = 0.4;
 const float Ka = 0.3;
 const float Kt = 0.9;
+const float Kr = 0.2;
 float Ks, Kd;
 
 const int SHAPE_NUM = 3;
@@ -124,12 +127,49 @@ vec3 computeLight(vec3 V, vec3 P, vec3 N, vec3 color) {
     vec3(Ks*LIGHT_I*pow(max(dot(R, V), 0.0), SPEC));
 }
 
+bool intersectRoom2(vec3 P, vec3 V,
+  out vec3 pos, out vec3 normal, out vec3 color) {
+  
+  vec3 tMin = (-ROOM_DIM-P) / V;
+  vec3 tMax = (ROOM_DIM-P) / V;
+  vec3 t1 = min(tMin, tMax);
+  vec3 t2 = max(tMin, tMax);
+  float tNear = max(max(t1.x, t1.y), t1.z);
+  float tFar = min(min(t2.x, t2.y), t2.z);
+  
+  if (tNear<tFar && tFar>0.0) {
+    // take tFar, want back of box
+    
+    pos = P+tFar*V;
+    normal = vec3(0.0,  1.0, 0.0);
+    
+		if 			(pos.x < -ROOM_DIM[0]+EPS) { normal = vec3( 1.0, 0.0, 0.0); color = vec3(1.0, 1.0, 0.0); }
+		else if (pos.x >  ROOM_DIM[0]-EPS) { normal = vec3(-1.0, 0.0, 0.0); color = vec3(0.0, 0.0, 1.0); }
+		else if (pos.y < -ROOM_DIM[1]+EPS) {
+      normal = vec3(0.0,  1.0, 0.0);
+      if (fract(pos.x / 5.0) > 0.5 == fract(pos.z / 5.0) > 0.5) {
+        color = vec3(0.5);
+      }
+      else {
+        color = vec3(0.0);
+      }
+    }
+		else if (pos.y >  ROOM_DIM[1]-EPS) { normal = vec3(0.0, -1.0, 0.0); color = vec3(0.5); }
+		else if (pos.z < -ROOM_DIM[2]+EPS) { normal = vec3(0.0, 0.0,  1.0); color = vec3(0.5); }
+		else { normal = vec3(0.0, 0.0, -1.0); color = vec3(0.5); }
+    
+    return true;
+  }
+  
+  return false;
+}
+
 bool intersectRoom(vec3 P, vec3 V,
   out vec3 pos, out vec3 normal, out vec3 color) {
   
-  if (V.y < -0.01) {
-    pos = P + ((P.y + 2.7) / -V.y) * V;
-    if (abs(pos.x) > 5.0 || abs(pos.z) > 5.0) {
+  if (V.y < -EPS) {
+    pos = P + ((P.y + 2.5) / -V.y) * V;
+    if (pos.x*pos.x + pos.z*pos.z > 25.0) {
       return false;
     }
     normal = vec3(0.0, 1.0, 0.0);
@@ -140,7 +180,8 @@ bool intersectRoom(vec3 P, vec3 V,
       color = vec3(0.0);
     }
     return true;
-  }
+  }  
+  
   return false;
 }
 
@@ -168,7 +209,7 @@ bool intersectWorld(vec3 P, vec3 V,
     return true;
   }
   
-  return intersectRoom(P,V,pos,normal,color);
+  return intersectRoom2(P,V,pos,normal,color);
 }
 
 ///////////////////////////////////////////////////////////
@@ -193,24 +234,25 @@ void main(void)
   vec3 A = normalize(cross(C,camUp));
   vec3 B = -normalize(cross(A,C));
   
-  vec3 P = camPos+C + (2.0*vUv.x-1.0)*A + (2.0*vUv.y-1.0)*B;
+  // scale A and B by root3/3 : fov = 30 degrees
+  vec3 P = camPos+C + (2.0*vUv.x-1.0)*ROOTTHREE*A + (2.0*vUv.y-1.0)*ROOTTHREE*B;
   vec3 R1 = normalize(P-camPos);
   
-  vec3 p1, norm, p2;
+  vec3 p1, norm, p2, R2;
   vec3 col, colT, colM, col3;
   if (intersectWorld(camPos, R1, p1, norm, colT)) {
 		col = computeLight(R1, p1, norm, colT);
-		// colM = (colT + vec3(0.7)) / 1.7;
-		
-		// R1 = reflect(R1, norm);
-		// if (intersectWorld(p1+2.0*EPS*R1, R1, p2, norm, colT)) {
-			// col += computeLight(R1, p2, norm, colT) * colM;
-			// colM *= (colT + vec3(0.7)) / 1.7;
-			// R1 = reflect(R1, norm);
-			// if (intersectWorld(p2+2.0*EPS*R1, R1, p1, norm, colT)) {
-			 // col += computeLight(R1, p1, norm, colT) * colM;
-			// }
-		// }
+    colM = (colT + vec3(0.7)) / 1.7;
+    
+    R2 = reflect(R1, norm);
+    if (intersectWorld(p1+EPS*R2, R2, p2, norm, colT)) {
+      col += computeLight(R2, p2, norm, colT) * colM;
+      colM *= (colT + vec3(0.7)) / 1.7;
+      R1 = reflect(R1, norm);
+      if (intersectWorld(p2+EPS*R1, R1, p1, norm, colT)) {
+       col += computeLight(R1, p1, norm, colT) * colM;
+      }
+    }
   
     gl_FragColor = vec4(col, 1.0);
   }
