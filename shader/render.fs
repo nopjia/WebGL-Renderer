@@ -244,9 +244,9 @@ void main(void)
 		col = computeLight(R1, p1, norm, colT);
     colM = (colT + vec3(0.7)) / 1.7;
     
-    R2 = reflect(R1, norm);
-    if (intersectWorld(p1+EPS*R2, R2, p2, norm, colT)) {
-      col += computeLight(R2, p2, norm, colT) * colM;
+    R1 = reflect(R1, norm);
+    if (intersectWorld(p1+EPS*R1, R1, p2, norm, colT)) {
+      col += computeLight(R1, p2, norm, colT) * colM;
       colM *= (colT + vec3(0.7)) / 1.7;
       R1 = reflect(R1, norm);
       if (intersectWorld(p2+EPS*R1, R1, p1, norm, colT)) {
