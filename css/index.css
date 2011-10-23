@@ -23,7 +23,12 @@ div#webgl-container {
   
   margin-top:30px;
   
-  background-color:#000000;
+  /*background-color:#000000;*/
+}
+
+canvas#webgl-canvas {
+  width: 400px;
+	height: 400px;
 }
 
 div#content-container {

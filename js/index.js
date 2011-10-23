@@ -12,6 +12,7 @@ var $container;
 var gCamera, gScene, gRenderer;
 var gCamera2, gScene2;
 var gKeyboard; // keyboard state
+var gPhotons;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -48,19 +49,6 @@ function mouseMove(event) {
     $("#cam_pos").html("<b>cam_position:</b> "+gCamera2.position.x+", "+gCamera2.position.y+", "+gCamera2.position.z);
     $("#cam_up").html("<b>cam_up:</b> "+gCamera2.up.x+", "+gCamera2.up.y+", "+gCamera2.up.z);
   }
-}
-
-/* UPDATE */
-function update() {
-  if( gKeyboard.pressed("shift+R") ) {
-    gCamera2.position.set(0,0,10);
-    gCamera2.target.position.set(0);
-    gCamera2.up.set(0,1,0);
-  }
-  
-  gCamera2.update();
-  gRenderer.render(gScene2, gCamera2);
-  RequestAnimFrame(update);
 }
 
 function initScene() {
@@ -193,18 +181,31 @@ function initTHREE() {
   // scene for raytracing
   gScene2 = new THREE.Scene();
   
+  gPhotons = [
+    0.0, 0.0, 0.0,
+    5.0, 5.0, 5.0,
+    -5.0, 5.0, 5.0,
+    -5.0, 5.0, -5.0,
+    5.0, 5.0, -5.0,
+    5.0, -5.0, 5.0,
+    -5.0, -5.0, 5.0,
+    -5.0, -5.0, -5.0,
+    5.0, -5.0, -5.0,
+  ];
+  
   var uniforms = {
     WIDTH:      {type: "i", value: WIDTH},
     HEIGHT:     {type: "i", value: HEIGHT},
-    camPos:     {type: "v3", value: gCamera2.position},
-    camCenter:  {type: "v3", value: gCamera2.target.position},
-    camUp:      {type: "v3", value: gCamera2.up}
-  }
+    uCamPos:    {type: "v3", value: gCamera2.position},
+    uCamCenter: {type: "v3", value: gCamera2.target.position},
+    uCamUp:     {type: "v3", value: gCamera2.up},
+    uPhotons:   {type: "fv", value: photons}
+  };
   
   var shader = new THREE.MeshShaderMaterial({
     uniforms:       uniforms,
-    vertexShader:   $("#vertexshader").text(),
-    fragmentShader: $("#fragmentshader").text()
+    vertexShader:   $("#shader-vs").text(),
+    fragmentShader: $("#shader-fs").text()
   });
   
   // setup plane in scene for rendering
@@ -218,6 +219,20 @@ function initTHREE() {
   initScene();
 }
 
+
+/* UPDATE */
+function update() {
+  if( gKeyboard.pressed("shift+R") ) {
+    gCamera2.position.set(0,0,10);
+    gCamera2.target.position.set(0);
+    gCamera2.up.set(0,1,0);
+  }
+  
+  gCamera2.update();
+  gRenderer.render(gScene, gCamera);
+  RequestAnimFrame(update);
+}
+
 /* DOC READY */
 $(document).ready(function() {
   
@@ -227,5 +242,5 @@ $(document).ready(function() {
   }
   
   // load shader strings
-  $("#fragmentshader").load("shader/render.fs", init);  
+  $("#shader-fs").load("shader/render.fs", init);  
 });

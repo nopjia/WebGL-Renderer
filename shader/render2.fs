@@ -103,11 +103,11 @@ struct Photon {
 // GLOBALS 
 ////////////////////////////////////////////////////////////////////////////////
 
-varying vec2 vUv;
+varying vec2 vUV;
 
-uniform vec3 uCamCenter;
 uniform vec3 uCamPos;
 uniform vec3 uCamUp;
+uniform vec3 uCamCenter;
 
 const vec3 ROOM_DIM = vec3(5.0, 5.0, 5.0);
 const vec3 LIGHT_P = vec3(0.0, 5.0, 0.0);
@@ -123,8 +123,8 @@ float Ks, Kd;
 const int SHAPE_NUM = 3;
 Shape shapes[SHAPE_NUM];
 
-const int PHOTON_N = 9;
-uniform vec3 uPhotons[PHOTON_N];
+const int PHOTON_N = 5;
+Photon photons[PHOTON_N];
 
 ////////////////////////////////////////////////////////////////////////////////
 // GLOBAL FUNCTIONS
@@ -276,17 +276,17 @@ vec4 raytrace(vec3 P, vec3 V) {
   vec3 col, colT, colM, col3;
   if (intersectWorld(P, V, p1, norm, colT)) {
     col = computeLight(V, p1, norm, colT);
-    colM = (colT + vec3(0.7)) / 1.7;
-    
-    V = reflect(V, norm);
-    if (intersectWorld(p1+EPS*V, V, p2, norm, colT)) {
-      col += computeLight(V, p2, norm, colT) * colM;
-      colM *= (colT + vec3(0.7)) / 1.7;
-      V = reflect(V, norm);
-      if (intersectWorld(p2+EPS*V, V, p1, norm, colT)) {
-        col += computeLight(V, p1, norm, colT) * colM;
-      }
-    }
+    //colM = (colT + vec3(0.7)) / 1.7;
+    //
+    //V = reflect(V, norm);
+    //if (intersectWorld(p1+EPS*V, V, p2, norm, colT)) {
+    //  col += computeLight(V, p2, norm, colT) * colM;
+    //  colM *= (colT + vec3(0.7)) / 1.7;
+    //  V = reflect(V, norm);
+    //  if (intersectWorld(p2+EPS*V, V, p1, norm, colT)) {
+    //    col += computeLight(V, p1, norm, colT) * colM;
+    //  }
+    //}
   
     return vec4(col, 1.0);
   }
@@ -332,9 +332,9 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
 vec4 raytracePhoton(vec3 P, vec3 V) {
   bool hit = false;
   for (int i=0; i<PHOTON_N; i++) {
-    float t = dot((uPhotons[i]-P),V);
+    float t = dot((photons[i].pos-P),V);
     vec3 p = P+V*t;
-    if (distance(p,uPhotons[i])<.1)
+    if (distance(p,photons[i].pos)<.1)
       hit = true;
   }
   return hit ? vec4(1.0) : vec4(0.0, 0.0, 0.0, 1.0);
@@ -357,22 +357,35 @@ void initScene() {
   shapes[2] = newSphere(vec3(-1.5, 0.5, 2.0), .8, vec3(0.0, 0.9, 0.0));
 }
 
+//void main(void) {
+//  Ks = (1.0-Ka)*REFL;
+//  Kd = (1.0-Ka)*(1.0-REFL);
+//	
+//  initScene();
+//  //emitPhotons();
+//  
+//  photons[0] = Photon(vec3(0.0));
+//  photons[1] = Photon(vec3(5.0, 5.0, 5.0));
+//  photons[2] = Photon(vec3(-5.0, 5.0, 5.0));
+//  photons[3] = Photon(vec3(5.0, -5.0, 5.0));
+//  photons[4] = Photon(vec3(5.0, 5.0, -5.0));
+//  
+//  /* RAY TRACE */
+//  vec3 C = normalize(uCamCenter-uCamPos);
+//  vec3 A = normalize(cross(C,uCamUp));
+//  vec3 B = -normalize(cross(A,C));
+//  
+//  // scale A and B by root3/3 : fov = 30 degrees
+//  vec3 P = uCamPos+C + (2.0*vUV.x-1.0)*ROOTTHREE*A + (2.0*vUV.y-1.0)*ROOTTHREE*B;
+//  vec3 R1 = normalize(P-uCamPos);
+//  
+//  gl_FragColor = raytrace(uCamPos, R1);
+//	//gl_FragColor = vec4(vUV.x, vUV.y, 0.0, 1.0);
+//}
+
+uniform sampler2D uTexture;
+
 void main(void)
 {
-  Ks = (1.0-Ka)*REFL;
-  Kd = (1.0-Ka)*(1.0-REFL);
-	
-  initScene();
-  //emitPhotons();
-  
-  /* RAY TRACE */
-  vec3 C = normalize(uCamCenter-uCamPos);
-  vec3 A = normalize(cross(C,uCamUp));
-  vec3 B = -normalize(cross(A,C));
-  
-  // scale A and B by root3/3 : fov = 30 degrees
-  vec3 P = uCamPos+C + (2.0*vUv.x-1.0)*ROOTTHREE*A + (2.0*vUv.y-1.0)*ROOTTHREE*B;
-  vec3 R1 = normalize(P-uCamPos);
-  
-  gl_FragColor = raytracePhoton(uCamPos, R1);
+	gl_FragColor = texture2D(uTexture, vUV);
 }
