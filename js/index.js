@@ -64,9 +64,12 @@ function update() {
 }
 
 function initScene() {
-  var pointLight = new THREE.PointLight( 0xFFFFFF );
-  pointLight.position = new THREE.Vector3(0,5,0);
-  gScene2.addLight(pointLight); 
+  var light;
+  light = new THREE.PointLight( 0xFFFFFF );
+  light.position = new THREE.Vector3(0,5,0);
+  gScene2.addLight(light);
+  light = new THREE.AmbientLight( 0x111111 );
+  gScene2.addLight(light);
   
   var lambert1 = new THREE.MeshLambertMaterial(
   {
@@ -83,6 +86,65 @@ function initScene() {
   shape = new THREE.Mesh(new THREE.CubeGeometry(2, 2, 2), lambert1);
   node = new THREE.Object3D();
   node.position = new THREE.Vector3(2.5, -1.0, 1.5);
+  node.addChild(shape);
+  gScene2.addChild(node);
+  
+  shape = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), lambert1);
+  node = new THREE.Object3D();
+  node.position = new THREE.Vector3(-1.5, 0.5, 2.0);
+  node.addChild(shape);
+  gScene2.addChild(node);
+  
+  // top
+  shape = new THREE.Mesh(new THREE.PlaneGeometry(1,1), lambert1);
+  node = new THREE.Object3D();
+  node.position = new THREE.Vector3(0,5,0);
+  node.rotation = new THREE.Vector3(HALF_PI,0,0);
+  node.scale = new THREE.Vector3(10,10,10);
+  node.addChild(shape);
+  gScene2.addChild(node);
+  
+  // bottom
+  shape = new THREE.Mesh(new THREE.PlaneGeometry(1,1), lambert1);
+  node = new THREE.Object3D();
+  node.position = new THREE.Vector3(0,-5,0);
+  node.rotation = new THREE.Vector3(-HALF_PI,0,0);
+  node.scale = new THREE.Vector3(10,10,10);
+  node.addChild(shape);
+  gScene2.addChild(node);
+  
+  // left
+  shape = new THREE.Mesh(new THREE.PlaneGeometry(1,1), lambert1);
+  node = new THREE.Object3D();
+  node.position = new THREE.Vector3(-5,0,0);
+  node.rotation = new THREE.Vector3(0,HALF_PI,0);
+  node.scale = new THREE.Vector3(10,10,10);
+  node.addChild(shape);
+  gScene2.addChild(node);
+  
+  // right
+  shape = new THREE.Mesh(new THREE.PlaneGeometry(1,1), lambert1);
+  node = new THREE.Object3D();
+  node.position = new THREE.Vector3(5,0,0);
+  node.rotation = new THREE.Vector3(0,-HALF_PI,0);
+  node.scale = new THREE.Vector3(10,10,10);
+  node.addChild(shape);
+  gScene2.addChild(node);
+  
+  // back
+  shape = new THREE.Mesh(new THREE.PlaneGeometry(1,1), lambert1);
+  node = new THREE.Object3D();
+  node.position = new THREE.Vector3(0,0,-5);
+  node.scale = new THREE.Vector3(10,10,10);
+  node.addChild(shape);
+  gScene2.addChild(node);
+  
+  // front
+  shape = new THREE.Mesh(new THREE.PlaneGeometry(1,1), lambert1);
+  node = new THREE.Object3D();
+  node.position = new THREE.Vector3(0,0,5);
+  node.rotation = new THREE.Vector3(PI,0,0);
+  node.scale = new THREE.Vector3(10,10,10);
   node.addChild(shape);
   gScene2.addChild(node);
 }
