@@ -10,7 +10,8 @@ var WIDTH = 400,
 
 var $container;
 var gCamera, gScene, gRenderer;
-var gCamera2;
+var gCamera2, gScene2;
+var gKeyboard; // keyboard state
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,9 +52,39 @@ function mouseMove(event) {
 
 /* UPDATE */
 function update() {
+  if( gKeyboard.pressed("shift+R") ) {
+    gCamera2.position = new THREE.Vector3(0,0,10);
+    gCamera2.target.position = new THREE.Vector3(0);
+    gCamera2.up = new THREE.Vector3(0,1,0);
+  }
+  
   gCamera2.update();
-  gRenderer.render(gScene, gCamera);
+  gRenderer.render(gScene2, gCamera2);
   RequestAnimFrame(update);
+}
+
+function initScene() {
+  var pointLight = new THREE.PointLight( 0xFFFFFF );
+  pointLight.position = new THREE.Vector3(0,5,0);
+  gScene2.addLight(pointLight); 
+  
+  var lambert1 = new THREE.MeshLambertMaterial(
+  {
+    color: 0xCCCCCC
+  });
+  
+  var shape, node;
+  
+  shape = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 16), lambert1);
+  node = new THREE.Object3D();
+  node.addChild(shape);
+  gScene2.addChild(node);
+  
+  shape = new THREE.Mesh(new THREE.CubeGeometry(2, 2, 2), lambert1);
+  node = new THREE.Object3D();
+  node.position = new THREE.Vector3(2.5, -1.0, 1.5);
+  node.addChild(shape);
+  gScene2.addChild(node);
 }
 
 /* INIT GL */
@@ -64,6 +95,8 @@ function initGL() {
   $container.mouseup(mouseUp);
   $container.mousemove(mouseMove);
   
+  gKeyboard = new THREEx.KeyboardState();
+  
   // setup WebGL renderer
   gRenderer = new THREE.WebGLRenderer();
   gRenderer.setSize(WIDTH, HEIGHT);
@@ -72,6 +105,9 @@ function initGL() {
   // camera to render, orthogonal (fov=0)
   gCamera  = new THREE.Camera(0, WIDTH/HEIGHT, 1, 1e3);
   gCamera.position.z = 1;
+  
+  // scene for rendering
+  gScene = new THREE.Scene();
   
   // camera for raytracing
   gCamera2 = new THREE.TrackballCamera({
@@ -92,8 +128,8 @@ function initGL() {
   });
   gCamera2.position.z = 10;
   
-  // setup scene, for rendering
-  gScene = new THREE.Scene();
+  // scene for raytracing
+  gScene2 = new THREE.Scene();
   
   var uniforms = {
     WIDTH:      {type: "i", value: WIDTH},
@@ -109,18 +145,15 @@ function initGL() {
     fragmentShader: $("#fragmentshader").text()
   });
   
-  var lambert1 = new THREE.MeshLambertMaterial(
-  {
-    color: 0xCCCCCC
-  });
-  
-  var shape, node;
+  // setup plane in scene for rendering
+  var shape;
   shape = new THREE.Mesh(
      new THREE.PlaneGeometry(1, 1),
      shader);
-  node = new THREE.Object3D();
-  node.addChild(shape);
-  gScene.addChild(node);
+  gScene.addChild(shape);
+  
+  // setup "real" scene
+  initScene();
 }
 
 /* DOC READY */
