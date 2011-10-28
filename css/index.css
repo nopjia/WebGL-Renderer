@@ -13,7 +13,7 @@ body {
 }
 
 p {
-	margin-bottom: 15px;
+	margin-bottom: 5px;
 }
 
 div#webgl-container {
@@ -41,4 +41,9 @@ div#content-container {
 div#disclaimer {
 	margin-top:30px;
 	font-size:10px;
+}
+
+#gl-log p {
+	font-family:monospace;
+	font-size:12px;
 }

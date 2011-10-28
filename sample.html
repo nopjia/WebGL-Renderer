@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Sample Three.js</title>
+		<style>
+			#container {
+				background: #000;
+				width: 400px;
+				height: 400px;
+			}
+		</style>
+	</head>
+	<body>
+		
+		<div id="container">
+			
+			
+		</div>
+		
+		<div id="log">
+		</div>
+		
+	</body>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+	<script src="js/Three-r45.js"></script>
+	
+	<script type="text/javascript">
+		var scene, ray, renderer, camera;
+	
+		var WIDTH = 400;
+		var HEIGHT = 400;
+		
+		$(document).ready(function() {
+		
+			renderer = new THREE.WebGLRenderer();  
+			renderer.setSize(WIDTH, HEIGHT);
+			$('#container').append(renderer.domElement);
+						
+			scene = new THREE.Scene();
+			
+			camera = new THREE.PerspectiveCamera(30, WIDTH/HEIGHT, .1, 1e3);
+			camera.position.z = 5;
+			scene.add(camera);
+			
+			var sphereMaterial = new THREE.MeshLambertMaterial(
+			{
+					color: 0xCC0000
+			});
+			var sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16),sphereMaterial);
+			scene.add(sphere);
+			
+			var pointLight = new THREE.PointLight( 0xFFFFFF );
+			pointLight.position.set(0,10,0);
+			scene.add(pointLight);
+			
+			renderer.render(scene, camera);
+			
+			ray = new THREE.Ray(new THREE.Vector3(0,0,5), new THREE.Vector3(0,0,-1));
+			intersect = ray.intersectScene(scene);
+			$("#log").append("intersect:"+intersect+"<br>");
+		});
+	</script>
+</html>

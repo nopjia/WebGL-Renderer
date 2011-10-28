@@ -109,9 +109,9 @@ uniform vec3 uCamCenter;
 uniform vec3 uCamPos;
 uniform vec3 uCamUp;
 
-const vec3 ROOM_DIM = vec3(5.0, 5.0, 5.0);
-const vec3 LIGHT_P = vec3(0.0, 5.0, 0.0);
-const float LIGHT_I = 1.0;
+uniform vec3 uRoomDim;
+uniform vec3 uLightP;
+uniform float uLightI;
 
 const float SPEC = 30.0;
 const float REFL = 0.5;
@@ -122,8 +122,11 @@ float Ks, Kd;
 
 const int SHAPE_NUM = 3;
 Shape shapes[SHAPE_NUM];
+uniform vec3 uShapeP[SHAPE_NUM];
+uniform vec3 uShapeC[SHAPE_NUM];
+uniform float uShapeR[SHAPE_NUM];
 
-const int PHOTON_N = 9;
+const int PHOTON_N = 100;
 uniform vec3 uPhotons[PHOTON_N];
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -163,19 +166,19 @@ vec3 uniformRandomDirectionNY() {
 ////////////////////////////////////////////////////////////////////////////////
 
 vec3 computeLight(vec3 V, vec3 P, vec3 N, vec3 color) {
-  vec3 L = normalize(LIGHT_P-P);
+  vec3 L = normalize(uLightP-P);
   vec3 R = reflect(L, N);
   
   return
-    color*(Ka + Kd*LIGHT_I*dot(L, N)) +
-    vec3(Ks*LIGHT_I*pow(max(dot(R, V), 0.0), SPEC));
+    color*(Ka + Kd*uLightI*dot(L, N)) +
+    vec3(Ks*uLightI*pow(max(dot(R, V), 0.0), SPEC));
 }
 
-bool intersectRoom2(vec3 P, vec3 V,
+bool intersectRoom(vec3 P, vec3 V,
   out vec3 pos, out vec3 normal, out vec3 color) {
   
-  vec3 tMin = (-ROOM_DIM-P) / V;
-  vec3 tMax = (ROOM_DIM-P) / V;
+  vec3 tMin = (-uRoomDim-P) / V;
+  vec3 tMax = (uRoomDim-P) / V;
   vec3 t1 = min(tMin, tMax);
   vec3 t2 = max(tMin, tMax);
   float tNear = max(max(t1.x, t1.y), t1.z);
@@ -185,11 +188,10 @@ bool intersectRoom2(vec3 P, vec3 V,
     // take tFar, want back of box
     
     pos = P+tFar*V;
-    normal = vec3(0.0,  1.0, 0.0);
     
-		if 			(pos.x < -ROOM_DIM[0]+EPS) { normal = vec3( 1.0, 0.0, 0.0); color = vec3(1.0, 1.0, 0.0); }
-		else if (pos.x >  ROOM_DIM[0]-EPS) { normal = vec3(-1.0, 0.0, 0.0); color = vec3(0.0, 0.0, 1.0); }
-		else if (pos.y < -ROOM_DIM[1]+EPS) {
+		if 			(pos.x < -uRoomDim.x+EPS) { normal = vec3( 1.0, 0.0, 0.0); color = vec3(1.0, 1.0, 0.0); }
+		else if (pos.x >  uRoomDim.x-EPS) { normal = vec3(-1.0, 0.0, 0.0); color = vec3(0.0, 0.0, 1.0); }
+		else if (pos.y < -uRoomDim.y+EPS) {
       normal = vec3(0.0,  1.0, 0.0);
       if (fract(pos.x / 5.0) > 0.5 == fract(pos.z / 5.0) > 0.5) {
         color = vec3(0.5);
@@ -198,33 +200,12 @@ bool intersectRoom2(vec3 P, vec3 V,
         color = vec3(0.0);
       }
     }
-		else if (pos.y >  ROOM_DIM[1]-EPS) { normal = vec3(0.0, -1.0, 0.0); color = vec3(0.5); }
-		else if (pos.z < -ROOM_DIM[2]+EPS) { normal = vec3(0.0, 0.0,  1.0); color = vec3(0.5); }
+		else if (pos.y >  uRoomDim.y-EPS) { normal = vec3(0.0, -1.0, 0.0); color = vec3(0.5); }
+		else if (pos.z < -uRoomDim.z+EPS) { normal = vec3(0.0, 0.0,  1.0); color = vec3(0.5); }
 		else { normal = vec3(0.0, 0.0, -1.0); color = vec3(0.5); }
     
     return true;
   }
-  
-  return false;
-}
-
-bool intersectRoom(vec3 P, vec3 V,
-  out vec3 pos, out vec3 normal, out vec3 color) {
-  
-  if (V.y < -EPS) {
-    pos = P + ((P.y + 2.5) / -V.y) * V;
-    if (pos.x*pos.x + pos.z*pos.z > 25.0) {
-      return false;
-    }
-    normal = vec3(0.0, 1.0, 0.0);
-    if (fract(pos.x / 5.0) > 0.5 == fract(pos.z / 5.0) > 0.5) {
-      color = vec3(1.0);
-    }
-    else {
-      color = vec3(0.0);
-    }
-    return true;
-  }  
   
   return false;
 }
@@ -264,7 +245,7 @@ bool intersectWorld(vec3 P, vec3 V,
     return true;
   }
   
-  return intersectRoom2(P,V,pos,normal,color);
+  return intersectRoom(P,V,pos,normal,color);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -276,17 +257,17 @@ vec4 raytrace(vec3 P, vec3 V) {
   vec3 col, colT, colM, col3;
   if (intersectWorld(P, V, p1, norm, colT)) {
     col = computeLight(V, p1, norm, colT);
-    colM = (colT + vec3(0.7)) / 1.7;
-    
-    V = reflect(V, norm);
-    if (intersectWorld(p1+EPS*V, V, p2, norm, colT)) {
-      col += computeLight(V, p2, norm, colT) * colM;
-      colM *= (colT + vec3(0.7)) / 1.7;
-      V = reflect(V, norm);
-      if (intersectWorld(p2+EPS*V, V, p1, norm, colT)) {
-        col += computeLight(V, p1, norm, colT) * colM;
-      }
-    }
+    //colM = (colT + vec3(0.7)) / 1.7;
+    //
+    //V = reflect(V, norm);
+    //if (intersectWorld(p1+EPS*V, V, p2, norm, colT)) {
+    //  col += computeLight(V, p2, norm, colT) * colM;
+    //  colM *= (colT + vec3(0.7)) / 1.7;
+    //  V = reflect(V, norm);
+    //  if (intersectWorld(p2+EPS*V, V, p1, norm, colT)) {
+    //    col += computeLight(V, p1, norm, colT) * colM;
+    //  }
+    //}
   
     return vec4(col, 1.0);
   }
@@ -300,20 +281,20 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
   vec3 col, colT, colM, col3;
   vec3 L;
   if (intersectWorld(P, V, p1, norm, colT)) {
-    L = normalize(LIGHT_P-p1);
+    L = normalize(uLightP-p1);
     if (!intersectWorld(p1+EPS*L, L)) {
       col = computeLight(V, p1, norm, colT);
       colM = (colT + vec3(0.7)) / 1.7;
       
       V = reflect(V, norm);
       if (intersectWorld(p1+EPS*V, V, p2, norm, colT)) {
-        L = normalize(LIGHT_P-p2);
+        L = normalize(uLightP-p2);
         if (!intersectWorld(p2+EPS*L, L)) {
           col += computeLight(V, p2, norm, colT) * colM;
           colM *= (colT + vec3(0.7)) / 1.7;
           V = reflect(V, norm);
           if (intersectWorld(p2+EPS*V, V, p1, norm, colT)) {
-            L = normalize(LIGHT_P-p1);
+            L = normalize(uLightP-p1);
             if (!intersectWorld(p1+EPS*L, L)) {
               col += computeLight(V, p1, norm, colT) * colM;
             }
@@ -329,7 +310,7 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
   }
 }
 
-vec4 raytracePhoton(vec3 P, vec3 V) {
+vec4 raytracePhotons(vec3 P, vec3 V) {
   bool hit = false;
   for (int i=0; i<PHOTON_N; i++) {
     float t = dot((uPhotons[i]-P),V);
@@ -352,9 +333,13 @@ vec4 raytraceCheck(vec3 P, vec3 V) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void initScene() {
-	shapes[0] = newSphere(vec3(0.0, 0.0, 0.0),  1.2, vec3(0.0, 0.0, 0.9));
-  shapes[1] = newCube(vec3(2.5, -1.0, 1.5), 1.0, vec3(0.9, 0.0, 0.0));
-  shapes[2] = newSphere(vec3(-1.5, 0.5, 2.0), .8, vec3(0.0, 0.9, 0.0));
+  //shapes[0] = Shape(false, vec3(0.0, 0.0, 0.0), uShapeR[0], vec3(0.5));
+  //shapes[1] = Shape(true,  vec3(2.5, -1.0, 1.5), uShapeR[1], vec3(0.5));
+  //shapes[2] = Shape(false, vec3(-1.5, 0.5, 2.0), uShapeR[2], vec3(0.5));
+  
+  for (int i=0; i<SHAPE_NUM; i++) {
+    shapes[i] = newSphere(uShapeP[i], uShapeR[i], uShapeC[i]);
+  }
 }
 
 void main(void)
@@ -374,5 +359,5 @@ void main(void)
   vec3 P = uCamPos+C + (2.0*vUv.x-1.0)*ROOTTHREE*A + (2.0*vUv.y-1.0)*ROOTTHREE*B;
   vec3 R1 = normalize(P-uCamPos);
   
-  gl_FragColor = raytracePhoton(uCamPos, R1);
+  gl_FragColor = raytracePhotons(uCamPos, R1);
 }
