@@ -9,20 +9,22 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
 
-var $container;
-var gCamera, gScene, gRenderer;
-var gCamera2, gScene2, gControls;
+var container;
+var gRenderer, gStats;
+var gCamera, gScene, gCamera2, gScene2, gControls;
 var gKeyboard; // keyboard state
 
 var lambert1 = new THREE.MeshLambertMaterial({color: 0xCC0000});
 
-// scene globals to be passed as uniforms
-var gPhotonNum = 100;
-var gPhotons = [];
-
 var gRoomDim;
 var gLightP;
 var gLightI = 1.0;
+
+// scene globals to be passed as uniforms
+var gPhotonNum = 100;
+var gPhotonP = [];
+var gPhotonI = [];
+var gPhotonC = [];
 
 var gShapeNum = 3;
 var gShapeP = [];   // vec3
@@ -112,7 +114,7 @@ function intersectShape(i, P, V) {
 
 function getShapeNormal(i, hit) {
 	if (true) {
-		return hit.clone().subSelf(gShapeP[i]).divideSelf(gShapeR[i]);
+		return hit.clone().subSelf(gShapeP[i]).divideScalar(gShapeR[i]);
 	}
 	else {
 		return null; // not implemented
@@ -176,23 +178,23 @@ function intersectRoom(P, V) {
       gN = new THREE.Vector3(0.0, 1.0, 0.0);
       if (gPos.x/5.0-Math.floor(gPos.x/5) > 0.5 ==
           gPos.z/5.0-Math.floor(gPos.z/5) > 0.5) {
-        gCol = new THREE.Vector3(0.5);
+        gCol = new THREE.Vector3(0.5, 0.5, 0.5);
       }
       else {
-        gCol = new THREE.Vector3(0.0);
+        gCol = new THREE.Vector3();
       }
     }
 		else if (gPos.y >  gRoomDim.y-EPS) {
       gN = new THREE.Vector3(0.0, -1.0, 0.0);
-      gCol = new THREE.Vector3(0.5);
+      gCol = new THREE.Vector3(0.5, 0.5, 0.5);
     }
 		else if (gPos.z < -gRoomDim.z+EPS) {
       gN = new THREE.Vector3(0.0, 0.0,  1.0);
-      gCol = new THREE.Vector3(0.5);
+      gCol = new THREE.Vector3(0.5, 0.5, 0.5);
     }
 		else {
       gN = new THREE.Vector3(0.0, 0.0, -1.0);
-      gCol = new THREE.Vector3(0.5);
+      gCol = new THREE.Vector3(0.5, 0.5, 0.5);
     }
     
     return true;
@@ -201,7 +203,7 @@ function intersectRoom(P, V) {
   return false;
 }
 
-function intersectWorld(P, V) {  
+function intersectWorld(P, V) {
   var t_min = Number.MAX_VALUE;
   gT = 0;
   
@@ -243,6 +245,10 @@ function uniformRandomDirectionNY() {
 	return new THREE.Vector3(r * Math.cos(angle), y, r * Math.sin(angle));
 }
 
+function reflectVector3(V, N) {
+	return V.clone().subSelf( N.multiplyScalar(N.dot(V)*2) );
+}
+
 function scatterPhotons() {  
   var dot = new THREE.SphereGeometry(.2, 1, 1);
   
@@ -250,10 +256,20 @@ function scatterPhotons() {
     var P = gLightP;
     var V = new uniformRandomDirectionNY();
     
-    if (intersectWorld(P,V)) {
-      gPhotons.push(gPos.x, gPos.y, gPos.z);
-    }
+    var col = new THREE.Vector3(1,1,1);
+    castPhoton(P, V, col, 0);
   }
+}
+
+function castPhoton(P, V, col, depth) {
+	if (depth<3 && intersectWorld(P,V)) {	
+		gPhotonP.push(gPos.x, gPos.y, gPos.z);
+    gPhotonI.push(V.x, V.y, V.z);
+    gPhotonC.push(col.x, col.y, col.z);
+    
+		V = reflectVector3(V, gN);
+		castPhoton(gPos.addSelf(V.clone().multiplyScalar(EPS)), V, gCol, depth+1);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -264,33 +280,71 @@ function initScene() {
   gRoomDim = new THREE.Vector3(5.0, 5.0, 5.0);
   gLightP = new THREE.Vector3(0.0, 4.9, 0.0);
   
-  gShapeP.push(new THREE.Vector3(0.0, 0.0, 0.0));
-  gShapeR.push(1.2);
-  gShapeC.push(new THREE.Vector3(0.0, 0.0, 0.9));
-  
-  gShapeP.push(new THREE.Vector3(2.5, -1.0, 1.5));
-  gShapeR.push(1.0);
+  gShapeP.push(new THREE.Vector3(-0.5, 0.0, -1.5));
+  gShapeR.push(1.8);
   gShapeC.push(new THREE.Vector3(0.9, 0.0, 0.0));
   
-  gShapeP.push(new THREE.Vector3(-1.5, 0.5, 2.0));
-  gShapeR.push(0.8);
+  gShapeP.push(new THREE.Vector3(3.0, -2.0, 1.5));
+  gShapeR.push(1.5);
+  gShapeC.push(new THREE.Vector3(0.9, 0.0, 0.9));
+  
+  gShapeP.push(new THREE.Vector3(-2.0, 1.0, 2.0));
+  gShapeR.push(1.2);
   gShapeC.push(new THREE.Vector3(0.0, 0.9, 0.0));
+}
+
+function addPhotons() {
+  for (var i=0; i<gPhotonP.length; i+=3) {
+    var col = new THREE.Color();
+		col.setRGB(gPhotonC[i], gPhotonC[i+1], gPhotonC[i+2]);
+    
+    var material = new THREE.LineBasicMaterial( {
+      color: col.getHex(),
+      opacity: 1,
+      linewidth: 2
+    } );
+      
+    var v1 = new THREE.Vector3(gPhotonP[i], gPhotonP[i+1], gPhotonP[i+2]);
+    var v2 = v1.clone().subSelf(new THREE.Vector3(gPhotonI[i], gPhotonI[i+1], gPhotonI[i+2]));
+		var geometry = new THREE.Geometry();
+    geometry.vertices.push(new THREE.Vertex(v1));
+    geometry.vertices.push(new THREE.Vertex(v2));
+    
+    var line = new THREE.Line( geometry, material, THREE.LinePieces );
+		gScene2.add( line );
+  }
+  
+  addParticleSystem();
+}
+
+function addParticleSystem() {
+	var particles = new THREE.Geometry();
+	var mat = new THREE.ParticleBasicMaterial({color:0xFFFFFF, size:.5});
+	
+	for (var i=0; i<gPhotonP.length; i+=3) {
+		var particle = new THREE.Vertex(
+			new THREE.Vector3(gPhotonP[i], gPhotonP[i+1], gPhotonP[i+2]));
+		particles.vertices.push(particle);
+	}
+	
+	var sys = new THREE.ParticleSystem(particles,mat);
+	gScene2.add(sys);
 }
 
 /* INIT GL */
 function initTHREE() {
-  $container = $('#webgl-container')
+  container = $('#webgl-container')
   
-  $container.mousedown(mouseDown);
-  $container.mouseup(mouseUp);
-  $container.mousemove(mouseMove);
+  container.mousedown(mouseDown);
+  container.mouseup(mouseUp);
+  container.mousemove(mouseMove);
   
   gKeyboard = new THREEx.KeyboardState();
   
   // setup WebGL renderer
   gRenderer = new THREE.WebGLRenderer();
   gRenderer.setSize(WIDTH, HEIGHT);
-  $container.append(gRenderer.domElement);
+  container.append(gRenderer.domElement);
   
   // camera to render, orthogonal (fov=0)
   gCamera  = new THREE.OrthographicCamera(-.5, .5, .5, -.5, -1, 1);
@@ -315,26 +369,22 @@ function initTHREE() {
   gControls.noZoom = false;
   gControls.noPan = false;
     
-  // scene for raytracing
-  
+  // scene for raytracing  
+  gScene2 = new THREE.Scene();
   gScene2.add(gCamera2);
+	addPhotons();
   
   var uniforms = {
-    WIDTH:      {type: "i", value: WIDTH},
-    HEIGHT:     {type: "i", value: HEIGHT},
-    
     uCamPos:    {type: "v3", value: gCamera2.position},
     uCamCenter: {type: "v3", value: gControls.target},
     uCamUp:     {type: "v3", value: gCamera2.up},
     
-    uRoomDim:   {type: "v3", value: gRoomDim},
-    uLightP:    {type: "v3", value: gLightP},
-    uLightI:    {type: "f", value: gLightI},
-    
     uShapeP:    {type: "v3v", value: gShapeP},
     uShapeR:    {type: "fv1", value: gShapeR},
     uShapeC:    {type: "v3v", value: gShapeC},
-    uPhotons:   {type: "fv", value: gPhotons}
+		
+		uPhotonP:		{type: "fv", value: gPhotonP},
+		uPhotonC:		{type: "fv", value: gPhotonC}
   };
   
   var shader = new THREE.ShaderMaterial({
@@ -347,6 +397,12 @@ function initTHREE() {
   var shape;
   shape = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shader);
   gScene.add(shape);
+	
+	// stats ui
+	gStats = new Stats();
+	gStats.domElement.style.position = 'absolute';
+	gStats.domElement.style.top = '0px';
+	$("body").append( gStats.domElement );
 }
 
 /* UPDATE */
@@ -357,14 +413,13 @@ function update() {
     gCamera2.up.set(0,1,0);
   }
   
+	gStats.update();
   gControls.update();
-  gRenderer.render(gScene, gCamera);
+  gRenderer.render(gScene2, gCamera2);
   RequestAnimFrame(update);
 }
 
-function init() {
-  gScene2 = new THREE.Scene();
-  
+function init() {  
   initScene();
   scatterPhotons();
   initTHREE();
@@ -377,8 +432,9 @@ $(document).ready(function() {
   // load shader strings
   $("#shader-fs").load("shader/render.fs", init);
   
-  p = new THREE.Vector3(0, 0, 0);
-  v = new THREE.Vector3(.77, -.5, .4);
+//  p = new THREE.Vector3(0, 0, 0);
+//  v = new THREE.Vector3(.77, -.5, .4);
+//	n = new THREE.Vector3(0,1,0);
 });
 
 //function initScene() {

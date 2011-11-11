@@ -1,5 +1,31 @@
-// recursive method - not allowed
 
+vec4 raytrace(vec3 P, vec3 V) {
+  vec3 p1, norm, p2;
+  vec3 col, colT, colM, col3;
+  if (intersectWorld(P, V, p1, norm, colT)) {
+    col = computeLight(V, p1, norm, colT);
+    colM = (colT + vec3(0.7)) / 1.7;
+    
+    V = reflect(V, norm);
+    if (intersectWorld(p1+EPS*V, V, p2, norm, colT)) {
+      col += computeLight(V, p2, norm, colT) * colM;
+      colM *= (colT + vec3(0.7)) / 1.7;
+			
+      V = reflect(V, norm);
+      if (intersectWorld(p2+EPS*V, V, p1, norm, colT)) {
+        col += computeLight(V, p1, norm, colT) * colM;
+      }
+    }
+  
+    return vec4(col, 1.0);
+  }
+  else {
+    return vec4(0.0, 0.0, 0.0, 1.0);
+  }
+}
+
+
+// recursive method - not allowed
 vec3 raytrace(vec3 P, vec3 V, int depth) {
   vec3 pos, N, col, colSpec, colRefr;
   if (depth<3 && intersect(P, V, pos, N, col)) {
