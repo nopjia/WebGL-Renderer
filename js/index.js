@@ -21,7 +21,7 @@ var gLightP;
 var gLightI = 1.0;
 
 // scene globals to be passed as uniforms
-var gPhotonNum = 100;
+var gPhotonNum = 500;
 var gPhotonP = [];
 var gPhotonI = [];
 var gPhotonC = [];
@@ -39,6 +39,12 @@ function println(msg) {
 }
 function stringVector3(v) {
   return "("+v.x+" "+v.y+" "+v.z+")";
+}
+function max3(n1, n2, n3) {
+  return (n1 > n2) ? ((n1 > n3) ? n1 : n3) : ((n2 > n3) ? n2 : n3);
+}
+function min3(n1, n2, n3) {
+  return (n1 < n2) ? ((n1 < n3) ? n1 : n3) : ((n2 < n3) ? n2 : n3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -261,14 +267,25 @@ function scatterPhotons() {
   }
 }
 
+
 function castPhoton(P, V, col, depth) {
 	if (depth<3 && intersectWorld(P,V)) {	
-		gPhotonP.push(gPos.x, gPos.y, gPos.z);
+		// store current photon
+    gPhotonP.push(gPos.x, gPos.y, gPos.z);
     gPhotonI.push(V.x, V.y, V.z);
     gPhotonC.push(col.x, col.y, col.z);
     
-		V = reflectVector3(V, gN);
-		castPhoton(gPos.addSelf(V.clone().multiplyScalar(EPS)), V, gCol, depth+1);
+    // russian roulette
+    // col = incident photon color
+    // gCol = diffuse refl coeffs
+    var colTop = gCol.clone().multiplySelf(col);
+    var prob = max3(colTop.x, colTop.y, colTop.z) / max3(col.x, col.y, col.z);
+    
+    if (Math.random() < prob) {    
+    	V = reflectVector3(V, gN);
+      col.multiplySelf(gCol).multiplyScalar(prob);
+    	castPhoton(gPos.addSelf(V.clone().multiplyScalar(EPS)), V, col, depth+1);
+    }
 	}
 }
 
@@ -314,7 +331,7 @@ function addPhotons() {
 		gScene2.add( line );
   }
   
-  addParticleSystem();
+  //addParticleSystem();
 }
 
 function addParticleSystem() {
