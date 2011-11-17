@@ -32,11 +32,10 @@ Shape newCube(vec3 p, float r, vec3 c) {
 	Shape s = Shape(true, p, r, c);
   return s;
 }
-bool intersect(Shape s, vec3 P, vec3 V, out float t) {
-  
-  vec3 dist = P-s.pos;
-  
-  if (!s.geometry) {
+bool intersect(Shape s, vec3 P, vec3 V, out float t) {    
+  if (!s.geometry) {    
+    vec3 dist = P-s.pos;
+    
     float A = dot(V,V);
     float B = 2.0 * dot(dist,V);    
     float C = dot(dist,dist) - s.radius*s.radius;
@@ -120,14 +119,13 @@ const float Kt = 0.9;
 const float Kr = 0.2;
 float Ks, Kd;
 
-const int SHAPE_NUM = 3;
-Shape shapes[SHAPE_NUM];
-uniform vec3 uShapeP[SHAPE_NUM];
-uniform vec3 uShapeC[SHAPE_NUM];
-uniform float uShapeR[SHAPE_NUM];
+Shape shapes[SHAPE_N];
+uniform vec3 uShapeP[SHAPE_N];
+uniform vec3 uShapeC[SHAPE_N];
+uniform float uShapeR[SHAPE_N];
 
-const int PHOTON_N = 9;
 uniform vec3 uPhotonP[PHOTON_N];
+uniform vec3 uPhotonI[PHOTON_N];
 uniform vec3 uPhotonC[PHOTON_N];
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -214,7 +212,7 @@ bool intersectRoom(vec3 P, vec3 V,
 // check-only version
 bool intersectWorld(vec3 P, vec3 V) {  
   float t;
-  for (int i=0; i<SHAPE_NUM; i++) {
+  for (int i=0; i<SHAPE_N; i++) {
     if (intersect(shapes[i],P,V,t)) {
       return true;
     }
@@ -230,7 +228,7 @@ bool intersectWorld(vec3 P, vec3 V,
 	Shape s;
 	bool hit = false;
   vec3 n, c;
-  for (int i=0; i<SHAPE_NUM; i++) {
+  for (int i=0; i<SHAPE_N; i++) {
     if (intersect(shapes[i],P,V,t) && t<t_min) {
       t_min=t;
 			hit = true;
@@ -333,16 +331,12 @@ vec4 raytraceCheck(vec3 P, vec3 V) {
 // MAIN 
 ////////////////////////////////////////////////////////////////////////////////
 
-void initScene() {
-  //shapes[0] = Shape(false, vec3(0.0, 0.0, 0.0), uShapeR[0], vec3(0.5));
-  //shapes[1] = Shape(true,  vec3(2.5, -1.0, 1.5), uShapeR[1], vec3(0.5));
-  //shapes[2] = Shape(false, vec3(-1.5, 0.5, 2.0), uShapeR[2], vec3(0.5));
-  
-  for (int i=0; i<SHAPE_NUM; i++) {
-		if (i==1)
-			shapes[i] = newCube(uShapeP[i], uShapeR[i], uShapeC[i]);
-		else
+void initScene() {  
+  for (int i=0; i<SHAPE_N_TI; i++) {
 			shapes[i] = newSphere(uShapeP[i], uShapeR[i], uShapeC[i]);
+  }
+	for (int i=SHAPE_N_TI; i<SHAPE_N; i++) {
+			shapes[i] = newCube(uShapeP[i], uShapeR[i], uShapeC[i]);
   }
 }
 
@@ -362,5 +356,7 @@ void main(void)
   vec3 P = uCamPos+C + (2.0*vUv.x-1.0)*ROOTTHREE*A + (2.0*vUv.y-1.0)*ROOTTHREE*B;
   vec3 R1 = normalize(P-uCamPos);
   
-  gl_FragColor = raytrace(uCamPos, R1);
+  //gl_FragColor = raytrace(uCamPos, R1);
+  gl_FragColor = raytracePhotons(uCamPos, R1);
+  //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);
 }

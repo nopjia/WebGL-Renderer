@@ -17,7 +17,28 @@
 	<script type="text/javascript" src="js/THREEx.KeyboardState.js"></script>
   <script type="text/javascript" src="js/RequestAnimFrame.js"></script>
 	<script type="text/javascript" src="js/Stats.js"></script>
+	<script type="text/javascript" src="js/helper.js"></script>
   <script type="text/javascript" src="js/index.js"></script>
+	
+	<!-- SHADERS -->  
+  <script type="x-shader/x-vertex" id="shader-vs">
+    #ifdef GL_ES
+    precision highp float;
+    #endif
+    
+    varying vec2 vUv;
+    
+    void main()
+    {
+      vUv = uv;
+      gl_Position = projectionMatrix *
+                    modelViewMatrix *
+                    vec4(position,1.0);
+    } 
+  </script>
+  
+  <script type="x-shader/x-fragment" id="shader-fs"></script>
+	
 </head>
 
 <body>
@@ -39,25 +60,6 @@
     </div>-->
     
   </div>
-
-  <!-- SHADERS -->  
-  <script type="x-shader/x-vertex" id="shader-vs">
-    #ifdef GL_ES
-    precision highp float;
-    #endif
-    
-    varying vec2 vUv;
-    
-    void main()
-    {
-      vUv = uv;
-      gl_Position = projectionMatrix *
-                    modelViewMatrix *
-                    vec4(position,1.0);
-    } 
-  </script>
-  
-  <script type="x-shader/x-fragment" id="shader-fs"></script>
-
+	
 </body>
 </html>

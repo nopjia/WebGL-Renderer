@@ -8,6 +8,8 @@ var EPS = 0.0001,
 
 var WIDTH = 400,
     HEIGHT = 400;
+    
+var INIT_PHOTON_N = 20;
 
 var container;
 var gRenderer, gStats;
@@ -21,12 +23,13 @@ var gLightP;
 var gLightI = 1.0;
 
 // scene globals to be passed as uniforms
-var gPhotonNum = 500;
+var gPhotonNum = 0;
 var gPhotonP = [];
 var gPhotonI = [];
 var gPhotonC = [];
 
-var gShapeNum = 3;
+var gShapeNum = 0;
+var gShapeNumTi = 0; 	// 2nd half hold cubes
 var gShapeP = [];   // vec3
 var gShapeR = [];   // floats
 var gShapeC = [];   // vec3
@@ -36,15 +39,6 @@ var gT, gPos, gN, gCol;
 
 function println(msg) {
   $("#gl-log").append("<p>"+msg+"</p>");
-}
-function stringVector3(v) {
-  return "("+v.x+" "+v.y+" "+v.z+")";
-}
-function max3(n1, n2, n3) {
-  return (n1 > n2) ? ((n1 > n3) ? n1 : n3) : ((n2 > n3) ? n2 : n3);
-}
-function min3(n1, n2, n3) {
-  return (n1 < n2) ? ((n1 < n3) ? n1 : n3) : ((n2 < n3) ? n2 : n3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -89,9 +83,10 @@ function mouseMove(event) {
 
 // out t
 function intersectShape(i, P, V) {
-  var dist = P.clone().subSelf(gShapeP[i]);
-  
-  if (true) {
+  if (i < gShapeNumTi) {
+    // sphere case
+    var dist = P.clone().subSelf(gShapeP[i]);
+    
     var A = V.dot(V);
     var B = 2.0 * dist.dot(V);    
     var C = dist.dot(dist) - gShapeR[i]*gShapeR[i];
@@ -113,17 +108,68 @@ function intersectShape(i, P, V) {
     return false;
   }
   else {
-    // cube case, not implemented
+    // cube case    
+    var bMin = gShapeP[i].clone().addScalar(-gShapeR[i]);
+    var bMax = gShapeP[i].clone().addScalar(gShapeR[i]);
+    
+    var tNear = -Number.MAX_VALUE;
+    var tFar = Number.MAX_VALUE;
+    {
+      var t1, t2;
+      
+      t1 = (bMin.x-P.x)/V.x;
+      t2 = (bMax.x-P.x)/V.x;
+      if (t1>t2) {
+        var temp = t1;
+        t1 = t2;
+        t2 = temp;
+      }
+      if(t1>tNear) tNear = t1;
+      if(t2<tFar) tFar = t2;
+      
+      t1 = (bMin.y-P.y)/V.y;
+      t2 = (bMax.y-P.y)/V.y;
+      if (t1>t2) {
+        var temp = t1;
+        t1 = t2;
+        t2 = temp;
+      }    
+      if(t1>tNear) tNear = t1;
+      if(t2<tFar) tFar = t2;
+      
+      t1 = (bMin.z-P.z)/V.z;
+      t2 = (bMax.z-P.z)/V.z;
+      if (t1>t2) {
+        var temp = t1;
+        t1 = t2;
+        t2 = temp;
+      }    
+      if(t1>tNear) tNear = t1;
+      if(t2<tFar) tFar = t2;
+    }
+    
+    if (tNear<tFar && tFar>0.0) {
+      gT = tNear>0 ? tNear : tFar;
+      return true;
+    }
+    
     return false;
   }
 }
 
 function getShapeNormal(i, hit) {
-	if (true) {
+	if (i < gShapeNumTi) {
 		return hit.clone().subSelf(gShapeP[i]).divideScalar(gShapeR[i]);
 	}
 	else {
-		return null; // not implemented
+    var p = hit.clone().subSelf(gShapeP[i]);
+    var r = gShapeR[i];
+		if 			(p.x < -r+EPS) return new THREE.Vector3(-1.0, 0.0, 0.0);
+		else if (p.x >  r-EPS) return new THREE.Vector3( 1.0, 0.0, 0.0);
+		else if (p.y < -r+EPS) return new THREE.Vector3(0.0, -1.0, 0.0);
+		else if (p.y >  r-EPS) return new THREE.Vector3(0.0,  1.0, 0.0);
+		else if (p.z < -r+EPS) return new THREE.Vector3(0.0, 0.0, -1.0);
+		else return new THREE.Vector3(0.0, 0.0, 1.0);
 	}
 }
 
@@ -132,7 +178,6 @@ function intersectRoom(P, V) {
   
   var tNear = -Number.MAX_VALUE;
   var tFar = Number.MAX_VALUE;
-  var i;
   {
     var t1, t2;
     
@@ -214,7 +259,7 @@ function intersectWorld(P, V) {
   gT = 0;
   
   var i;
-  for (i=0; i<gShapeNum; i++) {
+  for (var i=0; i<gShapeNum; i++) {
     if (intersectShape(i,P,V) && gT<t_min) {
       t_min=gT;
       
@@ -233,32 +278,10 @@ function intersectWorld(P, V) {
 // PHOTON MAPPING
 ////////////////////////////////////////////////////////////////////////////////
 
-function uniformRandomDirection() {
-	var u = Math.random();
-	var v = Math.random();
-	var z = 1.0 - 2.0 * u;
-	var r = Math.sqrt(1.0 - z * z);
-	var angle = 6.283185307179586 * v;
-	return new THREE.Vector3(r * Math.cos(angle), r * Math.sin(angle), z);
-}
-
-function uniformRandomDirectionNY() {
-	var u = Math.random();
-	var v = Math.random();
-	var y = -1.0 * u;
-	var r = Math.sqrt(1.0 - y * y);
-	var angle = 6.283185307179586 * v;
-	return new THREE.Vector3(r * Math.cos(angle), y, r * Math.sin(angle));
-}
-
-function reflectVector3(V, N) {
-	return V.clone().subSelf( N.multiplyScalar(N.dot(V)*2) );
-}
-
 function scatterPhotons() {  
   var dot = new THREE.SphereGeometry(.2, 1, 1);
   
-  for (i=0; i<gPhotonNum; i++) {
+  for (var i=0; i<INIT_PHOTON_N; i++) {
     var P = gLightP;
     var V = new uniformRandomDirectionNY();
     
@@ -267,9 +290,10 @@ function scatterPhotons() {
   }
 }
 
-
 function castPhoton(P, V, col, depth) {
-	if (depth<3 && intersectWorld(P,V)) {	
+	if (depth<3 && intersectWorld(P,V)) {
+    gPhotonNum++;
+    
 		// store current photon
     gPhotonP.push(gPos.x, gPos.y, gPos.z);
     gPhotonI.push(V.x, V.y, V.z);
@@ -293,21 +317,39 @@ function castPhoton(P, V, col, depth) {
 // INITIALIZATION
 ////////////////////////////////////////////////////////////////////////////////
 
+function pushShape(pos, col, radius) {
+  gShapeP.push(pos);
+  gShapeC.push(col);
+  gShapeR.push(radius);
+  gShapeNum++;
+}
+
 function initScene() {
   gRoomDim = new THREE.Vector3(5.0, 5.0, 5.0);
   gLightP = new THREE.Vector3(0.0, 4.9, 0.0);
   
-  gShapeP.push(new THREE.Vector3(-0.5, 0.0, -1.5));
-  gShapeR.push(1.8);
-  gShapeC.push(new THREE.Vector3(0.9, 0.0, 0.0));
+	// spheres
   
-  gShapeP.push(new THREE.Vector3(3.0, -2.0, 1.5));
-  gShapeR.push(1.5);
-  gShapeC.push(new THREE.Vector3(0.9, 0.0, 0.9));
+  pushShape(
+    new THREE.Vector3(-1.0, 0.0, -1.5),
+    new THREE.Vector3(0.9, 0.0, 0.0),
+    1.8);  
+  pushShape(
+    new THREE.Vector3(-2.5, 1.0, 2.0),
+    new THREE.Vector3(0.0, 0.9, 0.0),
+    1.2);
+	
+	// cubes
+  gShapeNumTi = gShapeNum;
   
-  gShapeP.push(new THREE.Vector3(-2.0, 1.0, 2.0));
-  gShapeR.push(1.2);
-  gShapeC.push(new THREE.Vector3(0.0, 0.9, 0.0));
+	pushShape(
+    new THREE.Vector3(2.5, -2.0, 1.5),
+    new THREE.Vector3(0.9, 0.0, 0.9),
+    1.5);
+	pushShape(
+	  new THREE.Vector3(2.5, 1.0, -2.0),
+    new THREE.Vector3(0.0, 0.5, 0.0),
+    1.0);
 }
 
 function addPhotons() {
@@ -346,6 +388,18 @@ function addParticleSystem() {
 	
 	var sys = new THREE.ParticleSystem(particles,mat);
 	gScene2.add(sys);
+}
+
+function initShaderConsts() {
+  var str =
+    "/* SET CONSTANTS */\n" +
+    "#define SHAPE_N " + gShapeNum + "\n" +
+    "#define SHAPE_N_TI " + gShapeNumTi + "\n" +
+    "#define PHOTON_N " + gPhotonNum + "\n" +
+    "\n";
+  console.log(str);
+  
+  $("#shader-fs").prepend(str)
 }
 
 /* INIT GL */
@@ -401,6 +455,7 @@ function initTHREE() {
     uShapeC:    {type: "v3v", value: gShapeC},
 		
 		uPhotonP:		{type: "fv", value: gPhotonP},
+    uPhotonI:		{type: "fv", value: gPhotonI},
 		uPhotonC:		{type: "fv", value: gPhotonC}
   };
   
@@ -432,13 +487,14 @@ function update() {
   
 	gStats.update();
   gControls.update();
-  gRenderer.render(gScene2, gCamera2);
+  gRenderer.render(gScene, gCamera);
   RequestAnimFrame(update);
 }
 
 function init() {  
   initScene();
   scatterPhotons();
+  initShaderConsts();
   initTHREE();
   RequestAnimFrame(update);
 }
@@ -449,75 +505,7 @@ $(document).ready(function() {
   // load shader strings
   $("#shader-fs").load("shader/render.fs", init);
   
-//  p = new THREE.Vector3(0, 0, 0);
-//  v = new THREE.Vector3(.77, -.5, .4);
-//	n = new THREE.Vector3(0,1,0);
+  p = new THREE.Vector3(0, 0, 0);
+  v = new THREE.Vector3(.77, -.5, .4);
+	n = new THREE.Vector3(0,1,0);
 });
-
-//function initScene() {
-//  var light;
-//  light = new THREE.PointLight( 0xFFFFFF );
-//  light.position.set(.1,5,.1);
-//  gScene2.add(light);
-//  light = new THREE.AmbientLight( 0x222222 );
-//  gScene2.add(light);
-//  
-//  var sphere = new THREE.SphereGeometry(1, 16, 16);
-//  var cube = new THREE.CubeGeometry(2,2,2);
-//  var plane = new THREE.PlaneGeometry(1,1);
-//  
-//  var shape;
-//  
-//  shape = new THREE.Mesh(sphere, lambert1);
-//  shape.scale.set(1.2, 1.2, 1.2);
-//  gScene2.add(shape);
-//  
-//  shape = new THREE.Mesh(cube, lambert1);
-//  shape.position.set(2.5, -1.0, 1.5);
-//  gScene2.add(shape);
-//  
-//  shape = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), lambert1);
-//  shape.position.set(-1.5, 0.5, 2.0);
-//  gScene2.add(shape);
-//  
-//  // top
-//  shape = new THREE.Mesh(plane, lambert1);
-//  shape.position.set(0.0, 5.0, 0.0);
-//  shape.rotation.set(HALF_PI, 0.0, 0.0);
-//  shape.scale.set(10.0, 10.0, 10.0);
-//  gScene2.add(shape);
-//  
-//  // bottom
-//  shape = new THREE.Mesh(plane, lambert1);
-//  shape.position.set(0.0, -5.0, 0.0);
-//  shape.rotation.set(-HALF_PI, 0.0, 0.0);
-//  shape.scale.set(10.0, 10.0, 10.0);
-//  gScene2.add(shape);
-//  
-//  // left
-//  shape = new THREE.Mesh(plane, lambert1);
-//  shape.position.set(-5,0,0);
-//  shape.rotation.set(0.0, HALF_PI, 0.0);
-//  shape.scale.set(10.0, 10.0, 10.0);
-//  gScene2.add(shape);
-//  
-//  // right
-//  shape = new THREE.Mesh(plane, lambert1);
-//  shape.position.set(5,0,0);
-//  shape.rotation.set(0.0, -HALF_PI, 0.0);
-//  shape.scale.set(10.0, 10.0, 10.0);
-//  gScene2.add(shape);
-//  
-//  // back
-//  shape = new THREE.Mesh(plane, lambert1);
-//  shape.position.set(0.0, 0.0, -5.0);
-//  shape.scale.set(10.0, 10.0, 10.0);
-//  gScene2.add(shape);
-//  
-//  // front
-//  shape = new THREE.Mesh(plane, lambert1);
-//  shape.position.set(0,0,5);
-//  shape.rotation.set(PI, 0.0, 0.0);
-//  shape.scale.set(10.0, 10.0, 10.0);
-//  gScene2.add(shape);
-//}
