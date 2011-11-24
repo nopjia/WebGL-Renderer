@@ -9,12 +9,17 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var INIT_PHOTON_N = 20;
+var INIT_PHOTON_N = 50;
 
 var container;
 var gRenderer, gStats;
 var gCamera, gScene, gCamera2, gScene2, gControls;
-var gKeyboard; // keyboard state
+
+var ViewMode = {
+  "WebGL"   : 0,
+  "Shader"  : 1
+}
+var gViewMode = ViewMode.WebGL;
 
 var lambert1 = new THREE.MeshLambertMaterial({color: 0xCC0000});
 
@@ -75,6 +80,28 @@ function mouseMove(event) {
     $("#cam_pos").html("<b>cam_position:</b> "+gCamera2.position.x+", "+gCamera2.position.y+", "+gCamera2.position.z);
     $("#cam_up").html("<b>cam_up:</b> "+gCamera2.up.x+", "+gCamera2.up.y+", "+gCamera2.up.z);
   }
+}
+
+function initKeyboardEvents() {
+  
+  $(document).keypress(function(event) {
+    var key = String.fromCharCode(event.which);
+    console.log("keypress "+key)    
+      
+    if( key == "R" ) {
+      gCamera2.position.set(0,0,10);
+      gControls.target.set(0,0,0);
+      gCamera2.up.set(0,1,0);
+    }
+    
+    if( key == "E" ) {
+      if (gViewMode == ViewMode.Shader)
+        gViewMode = ViewMode.WebGL;
+      else
+        gViewMode = ViewMode.Shader;
+    }
+  });
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -410,8 +437,6 @@ function initTHREE() {
   container.mouseup(mouseUp);
   container.mousemove(mouseMove);
   
-  gKeyboard = new THREEx.KeyboardState();
-  
   // setup WebGL renderer
   gRenderer = new THREE.WebGLRenderer();
   gRenderer.setSize(WIDTH, HEIGHT);
@@ -478,16 +503,15 @@ function initTHREE() {
 }
 
 /* UPDATE */
-function update() {
-  if( gKeyboard.pressed("shift+R") ) {
-    gCamera2.position.set(0,0,10);
-    gControls.target.set(0,0,0);
-    gCamera2.up.set(0,1,0);
-  }
-  
+function update() {   
 	gStats.update();
   gControls.update();
-  gRenderer.render(gScene, gCamera);
+  
+  if (gViewMode == ViewMode.Shader)
+    gRenderer.render(gScene, gCamera);
+  else if (gViewMode == ViewMode.WebGL)
+      gRenderer.render(gScene2, gCamera2);
+  
   RequestAnimFrame(update);
 }
 
@@ -496,6 +520,7 @@ function init() {
   scatterPhotons();
   initShaderConsts();
   initTHREE();
+  initKeyboardEvents();
   RequestAnimFrame(update);
 }
 

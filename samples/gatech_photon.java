@@ -131,7 +131,8 @@ float[] computePixelColor(float x, float y){
       if (tType == gType && tIndex == gIndex) //Ray from Light->Object Hits Object First?
         i = lightObject(gType, gIndex, gPoint, gAmbient); //Not In Shadow - Compute Lighting
       rgb[0]=i; rgb[1]=i; rgb[2]=i;
-      rgb = getColor(rgb,tType,tIndex);}
+      rgb = getColor(rgb,tType,tIndex);
+		}
   }
   return rgb;
 }
