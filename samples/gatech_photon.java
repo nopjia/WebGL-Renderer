@@ -131,8 +131,7 @@ float[] computePixelColor(float x, float y){
       if (tType == gType && tIndex == gIndex) //Ray from Light->Object Hits Object First?
         i = lightObject(gType, gIndex, gPoint, gAmbient); //Not In Shadow - Compute Lighting
       rgb[0]=i; rgb[1]=i; rgb[2]=i;
-      rgb = getColor(rgb,tType,tIndex);
-		}
+      rgb = getColor(rgb,tType,tIndex);}
   }
   return rgb;
 }
@@ -316,23 +315,17 @@ void render(){ //Render Several Lines of Pixels at Once Before Drawing
   while (iterations < (mouseDragging ? 1024 : max(pMax, 256) )){
   
     //Render Pixels Out of Order With Increasing Resolution: 2x2, 4x4, 16x16... 512x512
-    if (pCol >= pMax) {
-			pRow++; pCol = 0; 
-      if (pRow >= pMax) {
-				pIteration++; pRow = 0; pMax = int(pow(2,pIteration));
-			}
-		}
+    if (pCol >= pMax) {pRow++; pCol = 0; 
+      if (pRow >= pMax) {pIteration++; pRow = 0; pMax = int(pow(2,pIteration));}}
     boolean pNeedsDrawing = (pIteration == 1 || odd(pRow) || (!odd(pRow) && odd(pCol)));
-    x = pCol * (szImg/pMax); 
-		y = pRow * (szImg/pMax);
+    x = pCol * (szImg/pMax); y = pRow * (szImg/pMax);
     pCol++;
     
     if (pNeedsDrawing){
       iterations++;
       rgb = mul3c( computePixelColor(x,y), 255.0);               //All the Magic Happens in Here!
       stroke(rgb[0],rgb[1],rgb[2]); fill(rgb[0],rgb[1],rgb[2]);  //Stroke & Fill
-      rect(x,y,(szImg/pMax)-1,(szImg/pMax)-1);                   //Draw the Possibly Enlarged Pixel
-		}
+      rect(x,y,(szImg/pMax)-1,(szImg/pMax)-1);}                  //Draw the Possibly Enlarged Pixel
   }
   if (pRow == szImg-1) {empty = false;}
 }

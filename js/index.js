@@ -9,7 +9,7 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var INIT_PHOTON_N = 50;
+var INIT_PHOTON_N = 20;
 
 var container;
 var gRenderer, gStats;
@@ -19,7 +19,7 @@ var ViewMode = {
   "WebGL"   : 0,
   "Shader"  : 1
 }
-var gViewMode = ViewMode.WebGL;
+var gViewMode = ViewMode.Shader;
 
 var lambert1 = new THREE.MeshLambertMaterial({color: 0xCC0000});
 
@@ -373,10 +373,10 @@ function initScene() {
     new THREE.Vector3(2.5, -2.0, 1.5),
     new THREE.Vector3(0.9, 0.0, 0.9),
     1.5);
-	pushShape(
-	  new THREE.Vector3(2.5, 1.0, -2.0),
-    new THREE.Vector3(0.0, 0.5, 0.0),
-    1.0);
+//	pushShape(
+//	  new THREE.Vector3(2.5, 1.0, -2.0),
+//    new THREE.Vector3(0.0, 0.5, 0.0),
+//    1.0);
 }
 
 function addPhotons() {

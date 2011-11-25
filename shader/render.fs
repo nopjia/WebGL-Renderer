@@ -245,6 +245,46 @@ bool intersectWorld(vec3 P, vec3 V,
   
   return intersectRoom(P,V,pos,normal,color);
 }
+// indexed version
+bool intersectWorld(vec3 P, vec3 V,
+  out vec3 pos, out vec3 normal, out vec3 color, out int idx) {
+  
+  float t_min = HUGE_VAL;
+  
+  float t;
+	Shape s;
+	bool hit = false;
+  vec3 n, c;
+  for (int i=0; i<SHAPE_N; i++) {
+    if (intersect(shapes[i],P,V,t) && t<t_min) {
+      t_min=t;
+			hit = true;
+			s = shapes[i];
+      idx = i;
+    }
+  }
+  
+  if (hit) {
+    pos = P+V*t_min;
+		normal = getNormal(s, pos);
+		color = s.color;
+    return true;
+  }
+  
+  idx = -1;
+  
+  return intersectRoom(P,V,pos,normal,color);
+}
+// check&indexed version
+bool intersectWorld(vec3 P, vec3 V, int idx) {  
+  float t;
+  for (int i=0; i<SHAPE_N; i++) {
+    if (i!=idx && intersect(shapes[i],P,V,t)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // RAY TRACE 
@@ -278,22 +318,23 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
   vec3 p1, norm, p2;
   vec3 col, colT, colM, col3;
   vec3 L;
-  if (intersectWorld(P, V, p1, norm, colT)) {
+  int idx;
+  if (intersectWorld(P, V, p1, norm, colT, idx)) {
     L = normalize(uLightP-p1);
-    if (!intersectWorld(p1+EPS*L, L)) {
+    if (!intersectWorld(p1+EPS*L, L, idx)) {
       col = computeLight(V, p1, norm, colT);
       colM = (colT + vec3(0.7)) / 1.7;
       
       V = reflect(V, norm);
-      if (intersectWorld(p1+EPS*V, V, p2, norm, colT)) {
+      if (intersectWorld(p1+EPS*V, V, p2, norm, colT, idx)) {
         L = normalize(uLightP-p2);
-        if (!intersectWorld(p2+EPS*L, L)) {
+        if (!intersectWorld(p2+EPS*L, L, idx)) {
           col += computeLight(V, p2, norm, colT) * colM;
           colM *= (colT + vec3(0.7)) / 1.7;
           V = reflect(V, norm);
-          if (intersectWorld(p2+EPS*V, V, p1, norm, colT)) {
+          if (intersectWorld(p2+EPS*V, V, p1, norm, colT, idx)) {
             L = normalize(uLightP-p1);
-            if (!intersectWorld(p1+EPS*L, L)) {
+            if (!intersectWorld(p1+EPS*L, L, idx)) {
               col += computeLight(V, p1, norm, colT) * colM;
             }
           }
@@ -308,6 +349,59 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
   }
 }
 
+#define GATHER_SQRAD 0.8
+vec4 raytraceGather(vec3 P, vec3 V) {
+	vec3 col = vec3(0.0);
+  vec3 p, norm, coli;
+  int idx;
+  if (intersectWorld(P, V, p, norm, coli, idx)) {
+		// raytrace
+    vec3 L = normalize(uLightP-p);
+    if (!intersectWorld(p+EPS*L, L, idx))
+      col = computeLight(V, p, norm, coli);
+    
+		// gather photons
+		for (int i=0; i<PHOTON_N; i++) {
+			vec3 dist = uPhotonP[i]-p;
+			float sqdist = dot(dist,dist);
+			if (sqdist<GATHER_SQRAD) {
+				col += 0.2 * uPhotonC[i]
+          * max(0.0, -dot(norm, uPhotonI[i]))
+          * (GATHER_SQRAD-sqdist)/GATHER_SQRAD;
+			}
+		}
+	}
+	return vec4(col, 1.0);
+}
+
+vec4 test(vec3 P, vec3 V) {
+	float GATHERRAD = .01;
+
+	vec3 col = vec3(0.0);
+	vec2 p1 = vec2(.5, .5);
+	vec2 p2 = vec2(.35, .5);
+	
+	vec2 p = vec2(vUv.x, vUv.y);
+	bool hit = false;
+	
+	vec2 dist = p1-p;
+	float sqdist = dot(dist,dist);	
+	if (sqdist<GATHERRAD) {
+		//col += vec3((GATHERRAD-sqdist)/GATHERRAD);
+		col = 1.0-( (1.0-vec3((GATHERRAD-sqdist)/GATHERRAD))*(1.0-col) ); // use screen?
+		hit = true;
+	}
+	dist = p2-p;
+	sqdist = dot(dist,dist);	
+	if (sqdist<GATHERRAD) {
+		//col += vec3((GATHERRAD-sqdist)/GATHERRAD);
+		col = 1.0-( (1.0-vec3((GATHERRAD-sqdist)/GATHERRAD))*(1.0-col) );
+		hit = true;
+	}
+	
+	return hit ? vec4(col, 1.0) : vec4(0.0, 0.0, 0.0, 0.0);
+}
+
 vec4 raytracePhotons(vec3 P, vec3 V) {
   bool hit = false;
 	float t;
@@ -315,7 +409,8 @@ vec4 raytracePhotons(vec3 P, vec3 V) {
   for (int i=0; i<PHOTON_N; i++) {
     t = dot((uPhotonP[i]-P),V);
     p = P+V*t;
-    if (distance(p,uPhotonP[i])<.1) {
+		vec3 dist = uPhotonP[i]-p;
+    if (dot(dist,dist)<.01) {
       hit = true;
 			c = uPhotonC[i];
     }
@@ -357,6 +452,8 @@ void main(void)
   vec3 R1 = normalize(P-uCamPos);
   
   //gl_FragColor = raytrace(uCamPos, R1);
-  gl_FragColor = raytracePhotons(uCamPos, R1);
+  //gl_FragColor = raytraceShadow(uCamPos, R1);
+  //gl_FragColor = raytracePhotons(uCamPos, R1);
+	gl_FragColor = raytraceGather(uCamPos, R1);
   //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);
 }
