@@ -128,6 +128,10 @@ uniform vec3 uPhotonP[PHOTON_N];
 uniform vec3 uPhotonI[PHOTON_N];
 uniform vec3 uPhotonC[PHOTON_N];
 
+uniform sampler2D uITex;
+uniform sampler2D uISTex;
+uniform sampler2D uCTex;
+
 ////////////////////////////////////////////////////////////////////////////////
 // GLOBAL FUNCTIONS
 ////////////////////////////////////////////////////////////////////////////////
@@ -349,16 +353,31 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
   }
 }
 
-#define GATHER_SQRAD 0.8
+vec3 getPhotonC(vec2 lookup) {
+	return texture2D(uCTex, lookup).rgb;
+}
+
+vec3 getPhotonI(vec2 lookup) {
+	vec3 val = texture2D(uITex, lookup).rgb;
+	vec3 sign = texture2D(uISTex, lookup).rgb;
+	
+	if (sign.x<0.5) val.x = -val.x;
+	if (sign.y<0.5) val.y = -val.y;
+	if (sign.z<0.5) val.z = -val.z;
+		
+	return val;
+}
+
+#define GATHER_SQRAD 1.5
 vec4 raytraceGather(vec3 P, vec3 V) {
 	vec3 col = vec3(0.0);
   vec3 p, norm, coli;
   int idx;
   if (intersectWorld(P, V, p, norm, coli, idx)) {
 		// raytrace
-    vec3 L = normalize(uLightP-p);
-    if (!intersectWorld(p+EPS*L, L, idx))
-      col = computeLight(V, p, norm, coli);
+    //vec3 L = normalize(uLightP-p);
+    //if (!intersectWorld(p+EPS*L, L, idx))
+    //  col = computeLight(V, p, norm, coli);
     
 		// gather photons
 		for (int i=0; i<PHOTON_N; i++) {
@@ -375,31 +394,50 @@ vec4 raytraceGather(vec3 P, vec3 V) {
 }
 
 vec4 test(vec3 P, vec3 V) {
-	float GATHERRAD = .01;
-
-	vec3 col = vec3(0.0);
-	vec2 p1 = vec2(.5, .5);
-	vec2 p2 = vec2(.35, .5);
-	
-	vec2 p = vec2(vUv.x, vUv.y);
-	bool hit = false;
-	
-	vec2 dist = p1-p;
-	float sqdist = dot(dist,dist);	
-	if (sqdist<GATHERRAD) {
-		//col += vec3((GATHERRAD-sqdist)/GATHERRAD);
-		col = 1.0-( (1.0-vec3((GATHERRAD-sqdist)/GATHERRAD))*(1.0-col) ); // use screen?
-		hit = true;
+	//float GATHERRAD = .01;
+	//
+	//vec3 col = vec3(0.0);
+	//vec2 p1 = vec2(.5, .5);
+	//vec2 p2 = vec2(.35, .5);
+	//
+	//vec2 p = vec2(vUv.x, vUv.y);
+	//bool hit = false;
+	//
+	//vec2 dist = p1-p;
+	//float sqdist = dot(dist,dist);	
+	//if (sqdist<GATHERRAD) {
+	//	//col += vec3((GATHERRAD-sqdist)/GATHERRAD);
+	//	col = 1.0-( (1.0-vec3((GATHERRAD-sqdist)/GATHERRAD))*(1.0-col) ); // use screen?
+	//	hit = true;
+	//}
+	//dist = p2-p;
+	//sqdist = dot(dist,dist);	
+	//if (sqdist<GATHERRAD) {
+	//	//col += vec3((GATHERRAD-sqdist)/GATHERRAD);
+	//	col = 1.0-( (1.0-vec3((GATHERRAD-sqdist)/GATHERRAD))*(1.0-col) );
+	//	hit = true;
+	//}
+	//
+	//return hit ? vec4(col, 1.0) : vec4(0.0, 0.0, 0.0, 0.0);
+  
+  vec3 col = vec3(0.0);
+  vec3 p, norm, coli;
+  int idx;
+  if (intersectWorld(P, V, p, norm, coli, idx)) {
+		
+		for (int i=0; i<PHOTON_N; i++) {
+			vec3 dist = uPhotonP[i]-p;
+			float sqdist = dot(dist,dist);
+			
+			if (sqdist<GATHER_SQRAD) {			
+				vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+				col += 0.5 * getPhotonC(lookup)
+					* (GATHER_SQRAD-sqdist)/GATHER_SQRAD;
+			}
+		}
+		
 	}
-	dist = p2-p;
-	sqdist = dot(dist,dist);	
-	if (sqdist<GATHERRAD) {
-		//col += vec3((GATHERRAD-sqdist)/GATHERRAD);
-		col = 1.0-( (1.0-vec3((GATHERRAD-sqdist)/GATHERRAD))*(1.0-col) );
-		hit = true;
-	}
-	
-	return hit ? vec4(col, 1.0) : vec4(0.0, 0.0, 0.0, 0.0);
+	return vec4(col, 1.0);
 }
 
 vec4 raytracePhotons(vec3 P, vec3 V) {
@@ -454,6 +492,9 @@ void main(void)
   //gl_FragColor = raytrace(uCamPos, R1);
   //gl_FragColor = raytraceShadow(uCamPos, R1);
   //gl_FragColor = raytracePhotons(uCamPos, R1);
-	gl_FragColor = raytraceGather(uCamPos, R1);
-  //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);
+  //gl_FragColor = raytraceGather(uCamPos, R1);
+	gl_FragColor = test(uCamPos, R1);
+  //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);	
+	//gl_FragColor = texture2D(uITex, vUv);
+	
 }

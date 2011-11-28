@@ -23,7 +23,8 @@ div#webgl-container {
   
   margin-top:30px;
   
-  /*background-color:#000000;*/
+  background-color:#000000;
+	background:url("../spinner.png") center no-repeat;
 }
 
 canvas#webgl-canvas {
