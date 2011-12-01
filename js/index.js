@@ -18,8 +18,8 @@ var gRenderer, gStats;
 var gCamera, gScene, gCamera2, gScene2, gControls;
 
 var ViewMode = {
-  "WebGL"   : 0,
-  "Shader"  : 1
+  WebGL   : 0,
+  Shader  : 1
 }
 var gViewMode = ViewMode.Shader;
 
@@ -42,12 +42,10 @@ var gShapeP = [];   // vec3
 var gShapeR = [];   // floats
 var gShapeC = [];   // vec3
 
+var gUniforms;
+
 // ray tracing globals
 var gT, gPos, gN, gCol;
-
-function println(msg) {
-  $("#gl-log").append("<p>"+msg+"</p>");
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // MOUSE CALLBACK
@@ -581,7 +579,7 @@ function initTHREE() {
   gScene2.add(gCamera2);
 	addPhotons();
   
-  var uniforms = {
+  gUniforms = {
     uCamPos:    {type: "v3", value: gCamera2.position},
     uCamCenter: {type: "v3", value: gControls.target},
     uCamUp:     {type: "v3", value: gCamera2.up},
@@ -589,10 +587,6 @@ function initTHREE() {
     uShapeP:    {type: "v3v", value: gShapeP},
     uShapeR:    {type: "fv1", value: gShapeR},
     uShapeC:    {type: "v3v", value: gShapeC},
-		
-		uPhotonP:		{type: "fv", value: gPhotonP},
-    uPhotonI:		{type: "fv", value: gPhotonI},
-		uPhotonC:		{type: "fv", value: gPhotonC},
     
     uCTex:      {type: "t", value: 0, texture: gCTex},
 		uPTex:      {type: "t", value: 1, texture: gPTex},
@@ -600,7 +594,7 @@ function initTHREE() {
   };
   
   var shader = new THREE.ShaderMaterial({
-    uniforms:       uniforms,
+    uniforms:       gUniforms,
     vertexShader:   $("#shader-vs").text(),
     fragmentShader: $("#shader-fs").text()
   });
