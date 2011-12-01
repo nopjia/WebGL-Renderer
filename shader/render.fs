@@ -131,6 +131,7 @@ uniform vec3 uPhotonC[PHOTON_N];
 uniform sampler2D uITex;
 uniform sampler2D uISTex;
 uniform sampler2D uCTex;
+uniform sampler2D uPTex;
 
 ////////////////////////////////////////////////////////////////////////////////
 // GLOBAL FUNCTIONS
@@ -357,15 +358,21 @@ vec3 getPhotonC(vec2 lookup) {
 	return texture2D(uCTex, lookup).rgb;
 }
 
+vec3 getPhotonP(vec2 lookup) {
+	return texture2D(uPTex, lookup).rgb * 10.0 - 5.0;
+}
+
 vec3 getPhotonI(vec2 lookup) {
 	vec3 val = texture2D(uITex, lookup).rgb;
 	vec3 sign = texture2D(uISTex, lookup).rgb;
 	
-	if (sign.x<0.5) val.x = -val.x;
-	if (sign.y<0.5) val.y = -val.y;
-	if (sign.z<0.5) val.z = -val.z;
+	vec3 col = vec3(val);
+	
+	if (sign.x<0.5) col.x = -col.x;
+	if (sign.y<0.5) col.y = -col.y;
+	if (sign.z<0.5) col.z = -col.z;
 		
-	return val;
+	return col;
 }
 
 #define GATHER_SQRAD 1.5
@@ -426,11 +433,11 @@ vec4 test(vec3 P, vec3 V) {
   if (intersectWorld(P, V, p, norm, coli, idx)) {
 		
 		for (int i=0; i<PHOTON_N; i++) {
-			vec3 dist = uPhotonP[i]-p;
+			vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+			vec3 dist = getPhotonP(lookup)-p;
 			float sqdist = dot(dist,dist);
 			
-			if (sqdist<GATHER_SQRAD) {			
-				vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+			if (sqdist<GATHER_SQRAD) {				
 				col += 0.5 * getPhotonC(lookup)
 					* (GATHER_SQRAD-sqdist)/GATHER_SQRAD;
 			}
@@ -494,7 +501,13 @@ void main(void)
   //gl_FragColor = raytracePhotons(uCamPos, R1);
   //gl_FragColor = raytraceGather(uCamPos, R1);
 	gl_FragColor = test(uCamPos, R1);
-  //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);	
+  //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);
 	//gl_FragColor = texture2D(uITex, vUv);
+	
+	//if (vUv.y < 0.5)
+	//	gl_FragColor = vec4(getPhotonC(vUv), 1.0);
+	//else
+	//	gl_FragColor = vec4(getPhotonP(vUv), 1.0);
+	
 	
 }

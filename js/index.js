@@ -9,8 +9,8 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var INIT_PHOTON_N = 70;
-var PHOTON_DEPTH = 2;
+var INIT_PHOTON_N = 10;
+var PHOTON_DEPTH = 1;
 
 var container;
 var gRenderer, gStats;
@@ -33,6 +33,7 @@ var gPhotonNum = 0;
 var gPhotonP = [];
 var gPhotonI = [];
 var gPhotonC = [];
+var gPTex, gCTex, gITex, gISTex;
 
 var gShapeNum = 0;
 var gShapeNumTi = 0; 	// 2nd half hold cubes
@@ -447,92 +448,65 @@ function addParticleSystem() {
 	gScene2.add(sys);
 }
 
-function saveImageDataURL(name, url) {
-  //var ajax = new XMLHttpRequest();
-  //ajax.open("POST",'saveimagedataurl.php',false);
-  //ajax.setRequestHeader('Content-Type', 'application/upload');
-  //ajax.send("name="+name+"&url="+url);
+function createTextures() {
+	var height = 1;
+	var width = gPhotonNum;	
+	var datac = new Uint8Array(width*height*3);
+	var datap = new Uint8Array(width*height*3);
 	
-	var request = $.ajax({
-		url: "saveimagedataurl.php",
-		type: "POST",
-		data: {name: name, url: url}
-	});
-
-}
-
-function createTextures() {  
-  var height = 1;
-  var width = gPhotonNum;
-  
-  {
-    $('body').append('<canvas id="gPhotonC-canvas" width="'+width+'" height="'+height+'"/>')
-    
-    var canvas = document.getElementById('gPhotonC-canvas');
-    var context = canvas.getContext('2d');
-    
-    var outputImg = context.createImageData(gPhotonNum, 1);
-    var outputData = outputImg.data;
-    
-    var oid = 0, pid = 0;
-    for (var y=0; y<height; y++) {
-      for (var x=0; x<width; x++) {
-        outputData[oid  ] = gPhotonC[pid  ]*255;
-        outputData[oid+1] = gPhotonC[pid+1]*255;
-        outputData[oid+2] = gPhotonC[pid+2]*255;
-        outputData[oid+3] = 255;
-        oid+=4;
-        pid+=3;
-      }
-    }
-    
-    context.putImageData(outputImg, 0, 0);
-		
-		saveImageDataURL("gphotonc.png", canvas.toDataURL());
-  }
-  
-  {
-    $('body').append('<canvas id="gPhotonI-canvas" width="'+width+'" height="'+height+'"/>')
-		$('body').append('<canvas id="gPhotonIS-canvas" width="'+width+'" height="'+height+'"/>')
-    
-    var canvasVal = document.getElementById('gPhotonI-canvas');
-		var canvasSign = document.getElementById('gPhotonIS-canvas');
-    var contextVal = canvasVal.getContext('2d');
-		var contextSign = canvasSign.getContext('2d');
-    
-    var outputImgVal = contextVal.createImageData(gPhotonNum, 1);
-		var outputImgSign = contextSign.createImageData(gPhotonNum, 1);
-    var outputDataVal = outputImgVal.data;
-		var outputDataSign = outputImgSign.data;
-    
-    // transformed values [-1,1] to [0,1] -> 128 point precision
-    
-    var oid = 0, pid = 0;
-    for (var y=0; y<height; y++) {
-      for (var x=0; x<width; x++) {
-				// store abs of value
-        outputDataVal[oid  ] = Math.abs(gPhotonI[pid  ]*255);
-        outputDataVal[oid+1] = Math.abs(gPhotonI[pid+1]*255);
-        outputDataVal[oid+2] = Math.abs(gPhotonI[pid+2]*255);
-        outputDataVal[oid+3] = 255;
-				
-				// store sign
-				outputDataSign[oid  ] = (gPhotonI[pid  ]>0.0) ? 255 : 0;
-        outputDataSign[oid+1] = (gPhotonI[pid+1]>0.0) ? 255 : 0;
-        outputDataSign[oid+2] = (gPhotonI[pid+2]>0.0) ? 255 : 0;
-        outputDataSign[oid+3] = 255;
-				
-        oid+=4;
-        pid+=3;
-      }
-    }
-    
-    contextVal.putImageData(outputImgVal, 0, 0);
-		contextSign.putImageData(outputImgSign, 0, 0);
-		
-		saveImageDataURL("gphotoni.png", canvasVal.toDataURL());
-		saveImageDataURL("gphotonis.png", canvasSign.toDataURL());
-  }
+	// fill color array
+	{		
+		var idx = 0;
+		for (var y=0; y<height; y++) {
+			for (var x=0; x<width; x++) {
+				datac[idx  ] = gPhotonC[idx  ]*255;
+				datac[idx+1] = gPhotonC[idx+1]*255;
+				datac[idx+2] = gPhotonC[idx+2]*255;
+				idx+=3;
+			}
+		}
+		gCTex = new THREE.DataTexture(datac, width, height, THREE.RGBFormat);
+		gCTex.needsUpdate = true;
+	}	
+	
+	// fill color array
+	{
+		var idx = 0;
+		for (var y=0; y<height; y++) {
+			for (var x=0; x<width; x++) {
+				datap[idx  ] = (gPhotonP[idx  ]+5.0)/10.0*255;
+				datap[idx+1] = (gPhotonP[idx+1]+5.0)/10.0*255;
+				datap[idx+2] = (gPhotonP[idx+2]+5.0)/10.0*255;
+				idx+=3;
+			}
+		}
+		gPTex = new THREE.DataTexture(datap, width, height, THREE.RGBFormat);
+		gPTex.needsUpdate = true;
+	}
+	
+	//// fill incident array
+	//{
+	//	var sdata = new Uint8Array(width*height*3);
+	//	
+	//	var idx = 0;
+	//	for (var y=0; y<height; y++) {
+	//		for (var x=0; x<width; x++) {
+	//			data[idx  ] = Math.abs(gPhotonI[idx  ])*255;
+	//			data[idx+1] = Math.abs(gPhotonI[idx+1])*255;
+	//			data[idx+2] = Math.abs(gPhotonI[idx+2])*255;
+	//			
+	//			sdata[idx  ] = (gPhotonI[idx  ]>0.0) ? 255 : 0;
+	//			sdata[idx+1] = (gPhotonI[idx+1]>0.0) ? 255 : 0;
+	//			sdata[idx+2] = (gPhotonI[idx+2]>0.0) ? 255 : 0;
+	//			
+	//			idx+=3;
+	//		}
+	//	}
+	//	gITex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
+	//	gITex.needsUpdate = true;
+	//	gISTex = new THREE.DataTexture(sdata, width, height, THREE.RGBFormat);
+	//	gISTex.needsUpdate = true;
+	//}
 }
 
 function initShaderConsts() {
@@ -601,9 +575,8 @@ function initTHREE() {
     uPhotonI:		{type: "fv", value: gPhotonI},
 		uPhotonC:		{type: "fv", value: gPhotonC},
     
-    uITex:      {type: "t", value: 0, texture: THREE.ImageUtils.loadTexture("gphotoni.png")},
-    uCTex:      {type: "t", value: 0, texture: THREE.ImageUtils.loadTexture("gphotonc.png")},
-		uISTex:     {type: "t", value: 0, texture: THREE.ImageUtils.loadTexture("gphotonis.png")}
+    uCTex:      {type: "t", value: 0, texture: gCTex},
+		uPTex:      {type: "t", value: 1, texture: gPTex}
   };
   
   var shader = new THREE.ShaderMaterial({
