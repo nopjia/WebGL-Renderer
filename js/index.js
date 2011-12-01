@@ -9,8 +9,9 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var INIT_PHOTON_N = 10;
+var PHOTON_INIT_N = 100;
 var PHOTON_DEPTH = 1;
+var PHOTON_EXPOS = "10.0";
 
 var container;
 var gRenderer, gStats;
@@ -262,13 +263,14 @@ function intersectRoom(P, V) {
     }
 		else if (gPos.y < -gRoomDim.y+EPS) {
       gN = new THREE.Vector3(0.0, 1.0, 0.0);
-      if (gPos.x/5.0-Math.floor(gPos.x/5) > 0.5 ==
-          gPos.z/5.0-Math.floor(gPos.z/5) > 0.5) {
-        gCol = new THREE.Vector3(0.5, 0.5, 0.5);
-      }
-      else {
-        gCol = new THREE.Vector3();
-      }
+      gCol = new THREE.Vector3(0.5, 0.5, 0.5);
+      //if (gPos.x/5.0-Math.floor(gPos.x/5) > 0.5 ==
+      //    gPos.z/5.0-Math.floor(gPos.z/5) > 0.5) {
+      //  gCol = new THREE.Vector3(0.5, 0.5, 0.5);
+      //}
+      //else {
+      //  gCol = new THREE.Vector3();
+      //}
     }
 		else if (gPos.y >  gRoomDim.y-EPS) {
       gN = new THREE.Vector3(0.0, -1.0, 0.0);
@@ -316,7 +318,7 @@ function intersectWorld(P, V) {
 function scatterPhotons() {  
   var dot = new THREE.SphereGeometry(.2, 1, 1);
   
-  for (var i=0; i<INIT_PHOTON_N; i++) {
+  for (var i=0; i<PHOTON_INIT_N; i++) {
     var P = gLightP;
     var V = new uniformRandomDirectionNY();
     
@@ -451,37 +453,53 @@ function addParticleSystem() {
 function createTextures() {
 	var height = 1;
 	var width = gPhotonNum;	
-	var datac = new Uint8Array(width*height*3);
-	var datap = new Uint8Array(width*height*3);
-	
-	// fill color array
-	{		
-		var idx = 0;
-		for (var y=0; y<height; y++) {
-			for (var x=0; x<width; x++) {
-				datac[idx  ] = gPhotonC[idx  ]*255;
-				datac[idx+1] = gPhotonC[idx+1]*255;
-				datac[idx+2] = gPhotonC[idx+2]*255;
-				idx+=3;
-			}
-		}
-		gCTex = new THREE.DataTexture(datac, width, height, THREE.RGBFormat);
-		gCTex.needsUpdate = true;
-	}	
 	
 	// fill color array
 	{
+    var data = new Uint8Array(width*height*3);
 		var idx = 0;
 		for (var y=0; y<height; y++) {
 			for (var x=0; x<width; x++) {
-				datap[idx  ] = (gPhotonP[idx  ]+5.0)/10.0*255;
-				datap[idx+1] = (gPhotonP[idx+1]+5.0)/10.0*255;
-				datap[idx+2] = (gPhotonP[idx+2]+5.0)/10.0*255;
+				data[idx  ] = gPhotonC[idx  ]*255;
+				data[idx+1] = gPhotonC[idx+1]*255;
+				data[idx+2] = gPhotonC[idx+2]*255;
 				idx+=3;
 			}
 		}
-		gPTex = new THREE.DataTexture(datap, width, height, THREE.RGBFormat);
+		gCTex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
+		gCTex.needsUpdate = true;
+	}	
+	
+	// positions
+	{
+    var data = new Uint8Array(width*height*3);
+		var idx = 0;
+		for (var y=0; y<height; y++) {
+			for (var x=0; x<width; x++) {
+				data[idx  ] = (gPhotonP[idx  ]+5.0)/10.0 * 255;
+				data[idx+1] = (gPhotonP[idx+1]+5.0)/10.0 * 255;
+				data[idx+2] = (gPhotonP[idx+2]+5.0)/10.0 * 255;
+				idx+=3;
+			}
+		}
+		gPTex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
 		gPTex.needsUpdate = true;
+	}
+  
+  // incident angles
+	{
+    var data = new Uint8Array(width*height*3);
+		var idx = 0;
+		for (var y=0; y<height; y++) {
+			for (var x=0; x<width; x++) {
+				data[idx  ] = (gPhotonI[idx  ]+1.0)/2.0 * 255;
+				data[idx+1] = (gPhotonI[idx+1]+1.0)/2.0 * 255;
+				data[idx+2] = (gPhotonI[idx+2]+1.0)/2.0 * 255;
+				idx+=3;
+			}
+		}
+		gITex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
+		gITex.needsUpdate = true;
 	}
 	
 	//// fill incident array
@@ -515,6 +533,7 @@ function initShaderConsts() {
     "#define SHAPE_N " + gShapeNum + "\n" +
     "#define SHAPE_N_TI " + gShapeNumTi + "\n" +
     "#define PHOTON_N " + gPhotonNum + "\n" +
+    "#define PHOTON_EXPOS " + PHOTON_EXPOS + "\n" +
     "\n";
   console.log(str);
   
@@ -576,7 +595,8 @@ function initTHREE() {
 		uPhotonC:		{type: "fv", value: gPhotonC},
     
     uCTex:      {type: "t", value: 0, texture: gCTex},
-		uPTex:      {type: "t", value: 1, texture: gPTex}
+		uPTex:      {type: "t", value: 1, texture: gPTex},
+    uITex:      {type: "t", value: 2, texture: gITex}
   };
   
   var shader = new THREE.ShaderMaterial({
@@ -625,8 +645,4 @@ $(document).ready(function() {
   
   // load shader strings
   $("#shader-fs").load("shader/render.fs", init);
-  
-  p = new THREE.Vector3(0, 0, 0);
-  v = new THREE.Vector3(.77, -.5, .4);
-	n = new THREE.Vector3(0,1,0);
 });
