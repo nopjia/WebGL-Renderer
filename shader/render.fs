@@ -364,6 +364,10 @@ vec3 getPhotonI(vec2 lookup) {
 }
 
 #define GATHER_SQRAD 8.0
+#define GATHER_RAD 2.8
+#define ALPHA 0.1918
+#define GAUSS_INNOM -.1440625
+#define GAUSS_DENOM .858152111
 vec4 raytraceGather(vec3 P, vec3 V) {
   vec3 col = vec3(0.0);
   vec3 p, norm, coli;
@@ -371,13 +375,12 @@ vec4 raytraceGather(vec3 P, vec3 V) {
   if (intersectWorld(P, V, p, norm, coli, idx)) {		
     for (int i=0; i<PHOTON_N; i++) {
       vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-      vec3 dist = getPhotonP(lookup)-p;
-      float sqdist = dot(dist,dist);
+      float dist = distance(getPhotonP(lookup),p);
       
-      if (sqdist<GATHER_SQRAD) {				
+      if (dist<GATHER_RAD) {
         col += getPhotonC(lookup)
           * max(0.0, -dot(norm, getPhotonI(lookup)))
-          * (GATHER_SQRAD-sqdist) / (GATHER_SQRAD*PHOTON_EXPOS);
+          * (GATHER_RAD-dist) / (GATHER_RAD*PHOTON_EXPOS);
       }
     }
 	}
@@ -391,18 +394,23 @@ vec4 test(vec3 P, vec3 V) {
   if (intersectWorld(P, V, p, norm, coli, idx)) {		
     for (int i=0; i<PHOTON_N; i++) {
       vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-      vec3 dist = getPhotonP(lookup)-p;
-      float sqdist = dot(dist,dist);
+      vec3 diff = getPhotonP(lookup)-p;
+			float sqdist = dot(diff,diff);
       
-      if (sqdist<GATHER_SQRAD) {				
-        col += getPhotonC(lookup)
-          * max(0.0, -dot(norm, getPhotonI(lookup)))
-          * (GATHER_SQRAD-sqdist) / (GATHER_SQRAD*PHOTON_EXPOS);
-      }
+
+				col += getPhotonC(lookup)
+					* max(0.0, -dot(norm, getPhotonI(lookup)))
+					//* (GATHER_SQRAD-sqdist) / (GATHER_SQRAD*PHOTON_EXPOS);
+					* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
+
     }
 	}
 	return vec4(col, 1.0);
 }
+#undef ALPHA
+#undef BETA
+#undef GAUSS_INNOM
+#undef GAUSS_DENOM
 
 // mirrored version
 //vec4 test(vec3 P, vec3 V) {  
@@ -498,7 +506,7 @@ void main(void)
   //gl_FragColor = raytraceShadow(uCamPos, R1);
   //gl_FragColor = raytracePhotons(uCamPos, R1);
   //gl_FragColor = raytraceGather(uCamPos, R1);
-	//gl_FragColor = test(uCamPos, R1);
+	gl_FragColor = test(uCamPos, R1);
   //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);
 	
 	//if (vUv.y < 0.5)
@@ -506,10 +514,10 @@ void main(void)
 	//else
 	//	gl_FragColor = vec4(getPhotonP(vUv), 1.0);
 
-	gl_FragColor = mix(
-		raytraceShadow(uCamPos, R1),
-		raytraceGather(uCamPos, R1),
-		uBlend
-	);
+	//gl_FragColor = mix(
+	//	raytraceShadow(uCamPos, R1),
+	//	raytraceGather(uCamPos, R1),
+	//	uBlend
+	//);
 	
 }
