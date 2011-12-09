@@ -108,6 +108,8 @@ uniform vec3 uCamCenter;
 uniform vec3 uCamPos;
 uniform vec3 uCamUp;
 
+uniform float uBlend;
+
 const vec3 uRoomDim = vec3(5.0, 5.0, 5.0);
 const vec3 uLightP = vec3(0.0, 4.9, 0.0);
 const float uLightI = 1.0;
@@ -326,6 +328,7 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
       col = computeLight(V, p1, norm, colT);
     colM = (colT + vec3(0.7)) / 1.7;
     
+		/*
     V = reflect(V, norm);
     if (intersectWorld(p1+EPS*V, V, p2, norm, colT, idx)) {
       L = normalize(uLightP-p2);
@@ -338,10 +341,8 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
         L = normalize(uLightP-p1);
         if (!intersectWorld(p1+EPS*L, L, idx))
           col += computeLight(V, p1, norm, colT) * colM;
-      }
-      
-    }
-  
+      }      
+    } */ 
   
     return vec4(col, 1.0);
   }
@@ -496,7 +497,7 @@ void main(void)
   //gl_FragColor = raytrace(uCamPos, R1);
   //gl_FragColor = raytraceShadow(uCamPos, R1);
   //gl_FragColor = raytracePhotons(uCamPos, R1);
-  gl_FragColor = raytraceGather(uCamPos, R1);
+  //gl_FragColor = raytraceGather(uCamPos, R1);
 	//gl_FragColor = test(uCamPos, R1);
   //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);
 	
@@ -504,5 +505,11 @@ void main(void)
 	//	gl_FragColor = vec4(getPhotonC(vUv), 1.0);
 	//else
 	//	gl_FragColor = vec4(getPhotonP(vUv), 1.0);
+
+	gl_FragColor = mix(
+		raytraceShadow(uCamPos, R1),
+		raytraceGather(uCamPos, R1),
+		uBlend
+	);
 	
 }

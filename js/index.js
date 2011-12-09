@@ -9,7 +9,7 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var PHOTON_INIT_N = 100;
+var PHOTON_INIT_N = 80;
 var PHOTON_DEPTH = 1;
 var PHOTON_EXPOS = "10.0";
 
@@ -22,6 +22,7 @@ var ViewMode = {
   Shader  : 1
 }
 var gViewMode = ViewMode.Shader;
+var gBlend = 0.70;
 
 var lambert1 = new THREE.MeshLambertMaterial({color: 0xCC0000});
 
@@ -89,24 +90,39 @@ function initKeyboardEvents() {
     var key = String.fromCharCode(event.which);
     console.log("keypress "+key)    
       
-    if( key == "R" ) {
+    if (key == "R") {
       gCamera2.position.set(0,0,10);
       gControls.target.set(0,0,0);
       gCamera2.up.set(0,1,0);
-    }
-    
-    if( key == "E" ) {
-      if (gViewMode == ViewMode.Shader)
+			console.log("reset camera");
+    }    
+    else if (key == "E") {
+      if (gViewMode == ViewMode.Shader) {
         gViewMode = ViewMode.WebGL;
-      else
+				console.log("viewmode: webGL");
+			}
+      else {
         gViewMode = ViewMode.Shader;
-    }
-    
-    if( key == "S" ) {
+				console.log("viewmode: shader");
+			}
+    }    
+    else if (key == "S") {
       var url = $('#webgl-container canvas').get(0).toDataURL();      
       window.open(url);
 			//$('body').append('<img src="'+url+'" />')
-    }
+			console.log("output image in new window");
+    }		
+		else if (key == "<") {
+			gBlend = Math.max(0.0, gBlend-0.10);
+			gUniforms.uBlend.value = gBlend;
+			console.log("blend: "+gBlend);
+		}
+		else if (key == ">") {
+			gBlend = Math.min(1.0, gBlend+0.10);
+			gUniforms.uBlend.value = gBlend;
+			console.log("blend: "+gBlend);
+		}
+		
   });
 
 }
@@ -499,30 +515,6 @@ function createTextures() {
 		gITex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
 		gITex.needsUpdate = true;
 	}
-	
-	//// fill incident array
-	//{
-	//	var sdata = new Uint8Array(width*height*3);
-	//	
-	//	var idx = 0;
-	//	for (var y=0; y<height; y++) {
-	//		for (var x=0; x<width; x++) {
-	//			data[idx  ] = Math.abs(gPhotonI[idx  ])*255;
-	//			data[idx+1] = Math.abs(gPhotonI[idx+1])*255;
-	//			data[idx+2] = Math.abs(gPhotonI[idx+2])*255;
-	//			
-	//			sdata[idx  ] = (gPhotonI[idx  ]>0.0) ? 255 : 0;
-	//			sdata[idx+1] = (gPhotonI[idx+1]>0.0) ? 255 : 0;
-	//			sdata[idx+2] = (gPhotonI[idx+2]>0.0) ? 255 : 0;
-	//			
-	//			idx+=3;
-	//		}
-	//	}
-	//	gITex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
-	//	gITex.needsUpdate = true;
-	//	gISTex = new THREE.DataTexture(sdata, width, height, THREE.RGBFormat);
-	//	gISTex.needsUpdate = true;
-	//}
 }
 
 function initShaderConsts() {
@@ -549,6 +541,7 @@ function initTHREE() {
   // setup WebGL renderer
   gRenderer = new THREE.WebGLRenderer();
   gRenderer.setSize(WIDTH, HEIGHT);
+	gRenderer.setClearColorHex(0x000, 1);
   container.append(gRenderer.domElement);
   
   // camera to render, orthogonal (fov=0)
@@ -590,7 +583,9 @@ function initTHREE() {
     
     uCTex:      {type: "t", value: 0, texture: gCTex},
 		uPTex:      {type: "t", value: 1, texture: gPTex},
-    uITex:      {type: "t", value: 2, texture: gITex}
+    uITex:      {type: "t", value: 2, texture: gITex},
+		
+		uBlend:			{type: "f", value: gBlend}
   };
   
   var shader = new THREE.ShaderMaterial({
@@ -635,8 +630,7 @@ function init() {
 }
 
 /* DOC READY */
-$(document).ready(function() {
-  
+$(document).ready(function() {  
   // load shader strings
   $("#shader-fs").load("shader/render.fs", init);
 });
