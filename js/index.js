@@ -9,7 +9,7 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var PHOTON_INIT_N = 100;
+var PHOTON_INIT_N = 80;
 var PHOTON_DEPTH = 1;
 var PHOTON_EXPOS = "10.0";
 

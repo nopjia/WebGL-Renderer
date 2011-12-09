@@ -374,14 +374,13 @@ vec4 raytraceGather(vec3 P, vec3 V) {
   int idx;
   if (intersectWorld(P, V, p, norm, coli, idx)) {		
     for (int i=0; i<PHOTON_N; i++) {
-      vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-      float dist = distance(getPhotonP(lookup),p);
-      
-      if (dist<GATHER_RAD) {
-        col += getPhotonC(lookup)
-          * max(0.0, -dot(norm, getPhotonI(lookup)))
-          * (GATHER_RAD-dist) / (GATHER_RAD*PHOTON_EXPOS);
-      }
+			vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+			vec3 diff = getPhotonP(lookup)-p;
+			float sqdist = dot(diff,diff);
+
+			col += getPhotonC(lookup)
+				* max(0.0, -dot(norm, getPhotonI(lookup)))
+				* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
     }
 	}
 	return vec4(col, 1.0);
@@ -391,19 +390,40 @@ vec4 test(vec3 P, vec3 V) {
   vec3 col = vec3(0.0);
   vec3 p, norm, coli;
   int idx;
-  if (intersectWorld(P, V, p, norm, coli, idx)) {		
-    for (int i=0; i<PHOTON_N; i++) {
-      vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-      vec3 diff = getPhotonP(lookup)-p;
-			float sqdist = dot(diff,diff);
-      
-
+  if (intersectWorld(P, V, p, norm, coli, idx)) {
+		
+		if (idx != 0) {
+			for (int i=0; i<PHOTON_N; i++) {
+				vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+				vec3 diff = getPhotonP(lookup)-p;
+				float sqdist = dot(diff,diff);
+	
 				col += getPhotonC(lookup)
 					* max(0.0, -dot(norm, getPhotonI(lookup)))
-					//* (GATHER_SQRAD-sqdist) / (GATHER_SQRAD*PHOTON_EXPOS);
 					* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
-
-    }
+			}
+		}
+		else {
+			// entering shape
+			V = refract(V, norm, 0.9);
+			P = p+EPS*V;
+			intersectWorld(P, V, p, norm, coli, idx);
+			// exiting shape
+			V = refract(V, -norm, 0.9);
+			P = p+EPS*V;
+			
+			if (intersectWorld(P, V, p, norm, coli, idx)) {
+			  for (int i=0; i<PHOTON_N; i++) {
+					vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+					vec3 diff = getPhotonP(lookup)-p;
+					float sqdist = dot(diff,diff);
+		
+					col += getPhotonC(lookup)
+						* max(0.0, -dot(norm, getPhotonI(lookup)))
+						* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
+				}
+			}
+		}
 	}
 	return vec4(col, 1.0);
 }
@@ -412,7 +432,7 @@ vec4 test(vec3 P, vec3 V) {
 #undef GAUSS_INNOM
 #undef GAUSS_DENOM
 
-// mirrored version
+// REFLECTION VERSION
 //vec4 test(vec3 P, vec3 V) {  
 //  vec3 col = vec3(0.0);
 //  vec3 p, norm, coli;
@@ -449,6 +469,47 @@ vec4 test(vec3 P, vec3 V) {
 //        }
 //      }
 //    }
+//	}
+//	return vec4(col, 1.0);
+//}
+// REFRACTION VERSION
+//vec4 test(vec3 P, vec3 V) {  
+//  vec3 col = vec3(0.0);
+//  vec3 p, norm, coli;
+//  int idx;
+//  if (intersectWorld(P, V, p, norm, coli, idx)) {
+//		
+//		if (idx != 0) {
+//			for (int i=0; i<PHOTON_N; i++) {
+//				vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+//				vec3 diff = getPhotonP(lookup)-p;
+//				float sqdist = dot(diff,diff);
+//	
+//				col += getPhotonC(lookup)
+//					* max(0.0, -dot(norm, getPhotonI(lookup)))
+//					* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
+//			}
+//		}
+//		else {
+//			// outer shell
+//			V = refract(V, norm, 0.9);
+//			P = p+EPS*V;
+//			intersectWorld(P, V, p, norm, coli, idx);
+//			V = refract(V, -norm, 0.9);
+//			P = p+EPS*V;
+//			
+//			if (intersectWorld(P, V, p, norm, coli, idx)) {
+//			  for (int i=0; i<PHOTON_N; i++) {
+//					vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+//					vec3 diff = getPhotonP(lookup)-p;
+//					float sqdist = dot(diff,diff);
+//		
+//					col += getPhotonC(lookup)
+//						* max(0.0, -dot(norm, getPhotonI(lookup)))
+//						* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
+//				}
+//			}
+//		}
 //	}
 //	return vec4(col, 1.0);
 //}
