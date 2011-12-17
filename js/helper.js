@@ -2,6 +2,11 @@ function println(msg) {
   $("#gl-log").append("<p>"+msg+"</p>");
 }
 
+// count number of lines
+function countLines(str) {
+	return str.match(/\n/g).length-1;
+}
+
 function max3(n1, n2, n3) {
   return (n1 > n2) ? ((n1 > n3) ? n1 : n3) : ((n2 > n3) ? n2 : n3);
 }

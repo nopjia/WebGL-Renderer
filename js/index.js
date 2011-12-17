@@ -9,9 +9,8 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var PHOTON_INIT_N = 80;
+var PHOTON_INIT_N = 100;
 var PHOTON_DEPTH = 1;
-var PHOTON_EXPOS = "10.0";
 
 var container;
 var gRenderer, gStats;
@@ -32,9 +31,9 @@ var gLightI = 1.0;
 
 // scene globals to be passed as uniforms
 var gPhotonNum = 0;
-var gPhotonP = [];
-var gPhotonI = [];
-var gPhotonC = [];
+var gPhotonP;
+var gPhotonI;
+var gPhotonC;
 var gPTex, gCTex, gITex, gISTex;
 
 var gShapeNum = 0;
@@ -46,7 +45,7 @@ var gShapeC = [];   // vec3
 var gUniforms;
 
 // ray tracing globals
-var gT, gPos, gN, gCol;
+var gT, gPos, gN, gCol, gI;
 
 ////////////////////////////////////////////////////////////////////////////////
 // MOUSE CALLBACK
@@ -270,14 +269,17 @@ function intersectRoom(P, V) {
 		if (gPos.x < -gRoomDim.x+EPS) {
       gN = new THREE.Vector3( 1.0, 0.0, 0.0);
       gCol = new THREE.Vector3(1.0, 1.0, 0.0);
+			gI = 0;
     }
 		else if (gPos.x >  gRoomDim.x-EPS) {
       gN = new THREE.Vector3(-1.0, 0.0, 0.0);
       gCol = new THREE.Vector3(0.0, 0.0, 1.0);
+			gI = 1;
     }
 		else if (gPos.y < -gRoomDim.y+EPS) {
       gN = new THREE.Vector3(0.0, 1.0, 0.0);
       gCol = new THREE.Vector3(0.5, 0.5, 0.5);
+			gI = 2;
       //if (gPos.x/5.0-Math.floor(gPos.x/5) > 0.5 ==
       //    gPos.z/5.0-Math.floor(gPos.z/5) > 0.5) {
       //  gCol = new THREE.Vector3(0.5, 0.5, 0.5);
@@ -289,14 +291,17 @@ function intersectRoom(P, V) {
 		else if (gPos.y >  gRoomDim.y-EPS) {
       gN = new THREE.Vector3(0.0, -1.0, 0.0);
       gCol = new THREE.Vector3(0.5, 0.5, 0.5);
+			gI = 3;
     }
 		else if (gPos.z < -gRoomDim.z+EPS) {
       gN = new THREE.Vector3(0.0, 0.0,  1.0);
       gCol = new THREE.Vector3(0.5, 0.5, 0.5);
+			gI = 4;
     }
 		else {
       gN = new THREE.Vector3(0.0, 0.0, -1.0);
       gCol = new THREE.Vector3(0.5, 0.5, 0.5);
+			gI = 5;
     }
     
     return true;
@@ -317,6 +322,8 @@ function intersectWorld(P, V) {
       gPos = P.clone().addSelf(V.clone().multiplyScalar(t_min));
       gN = getShapeNormal(i, gPos);
       gCol = gShapeC[i];
+			
+			gI = i+6;	// offset 6
       
 			return true;
     }
@@ -329,43 +336,53 @@ function intersectWorld(P, V) {
 // PHOTON MAPPING
 ////////////////////////////////////////////////////////////////////////////////
 
-function scatterPhotons() {  
-  var dot = new THREE.SphereGeometry(.2, 1, 1);
+function scatterPhotons() {
+	// initialize photon arrays
+	// 2D array, an array per shape
+	var totalShapes = gShapeNum+6; // offset 6 for room
+	gPhotonP = new Array(totalShapes);
+	gPhotonI = new Array(totalShapes);
+	gPhotonC = new Array(totalShapes);
+	for (var i=0; i<totalShapes; i++) {
+		gPhotonP[i] = new Array();
+		gPhotonI[i] = new Array();
+		gPhotonC[i] = new Array();
+	}
   
   for (var i=0; i<PHOTON_INIT_N; i++) {
     var P = gLightP;
     var V = new uniformRandomDirectionNY();
     
     var col = new THREE.Vector3(1,1,1);
-    castPhoton1(P, V, col, 0);
+    castPhoton(P, V, col, 0);
   }
 }
 
-function castPhoton(P, V, col, depth) {
-	if (depth<PHOTON_DEPTH && intersectWorld(P,V)) {
-    gPhotonNum++;
-        
-		// store current photon
-    gPhotonP.push(gPos.x, gPos.y, gPos.z);
-    gPhotonI.push(V.x, V.y, V.z);
-    gPhotonC.push(col.x, col.y, col.z);
-    
-    // russian roulette
-    // col = incident photon color
-    // gCol = diffuse refl coeffs
-    var colTop = gCol.clone().multiplySelf(col);
-    var prob = max3(colTop.x, colTop.y, colTop.z) / max3(col.x, col.y, col.z);
-    
-    if (Math.random() < prob) {    
-    	V = reflectVector3(V, gN);
-      col.multiplySelf(gCol).multiplyScalar(prob);
-    	castPhoton(gPos.addSelf(V.clone().multiplyScalar(EPS)), V, col, depth+1);
-    }
-	}
-}
+//function castPhoton(P, V, col, depth) {
+//	if (depth<PHOTON_DEPTH && intersectWorld(P,V)) {
+//    gPhotonNum++;
+//        
+//		// store current photon
+//    gPhotonP.push(gPos.x, gPos.y, gPos.z);
+//    gPhotonI.push(V.x, V.y, V.z);
+//    gPhotonC.push(col.x, col.y, col.z);
+//    
+//    // russian roulette
+//    // col = incident photon color
+//    // gCol = diffuse refl coeffs
+//    var colTop = gCol.clone().multiplySelf(col);
+//    var prob = max3(colTop.x, colTop.y, colTop.z) / max3(col.x, col.y, col.z);
+//    
+//    if (Math.random() < prob) {    
+//    	V = reflectVector3(V, gN);
+//      col.multiplySelf(gCol).multiplyScalar(prob);
+//    	castPhoton(gPos.addSelf(V.clone().multiplyScalar(EPS)), V, col, depth+1);
+//    }
+//	}
+//}
 
 // ga_tech style
-function castPhoton1(P, V, col, depth) {  
+function castPhoton(P, V, col, depth) {  
   if (depth<PHOTON_DEPTH && intersectWorld(P,V)) {
     gPhotonNum++;
     
@@ -374,12 +391,12 @@ function castPhoton1(P, V, col, depth) {
       col.x = Math.min(col.x, gCol.x);
       col.y = Math.min(col.y, gCol.y);
       col.z = Math.min(col.z, gCol.z);
-    }    
+    }
     
     // store photon
-    gPhotonP.push(gPos.x, gPos.y, gPos.z);
-    gPhotonI.push(V.x, V.y, V.z);
-    gPhotonC.push(col.x, col.y, col.z);
+    gPhotonP[gI].push(gPos.x, gPos.y, gPos.z);
+    gPhotonI[gI].push(V.x, V.y, V.z);
+    gPhotonC[gI].push(col.x, col.y, col.z);
     
     // reflect then cast another
     V = reflectVector3(V, gN);
@@ -472,14 +489,16 @@ function createTextures() {
 	{
     var data = new Uint8Array(width*height*3);
 		var idx = 0;
-		for (var y=0; y<height; y++) {
-			for (var x=0; x<width; x++) {
-				data[idx  ] = gPhotonC[idx  ]*255;
-				data[idx+1] = gPhotonC[idx+1]*255;
-				data[idx+2] = gPhotonC[idx+2]*255;
-				idx+=3;
+		
+		// loop through each photon subarray
+		for (var i=0; i<gShapeNum+6; i++) {
+			for (var j=0; j<gPhotonC[i].length; j++) {
+				data[idx++] = gPhotonC[i][j]*255;
 			}
-		}
+		}		
+		if (data.length != gPhotonNum*3)
+			console.log("ERROR: photon count in texture.")
+		
 		gCTex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
 		gCTex.needsUpdate = true;
 	}	
@@ -488,14 +507,15 @@ function createTextures() {
 	{
     var data = new Uint8Array(width*height*3);
 		var idx = 0;
-		for (var y=0; y<height; y++) {
-			for (var x=0; x<width; x++) {
-				data[idx  ] = (gPhotonP[idx  ]+5.0)/10.0 * 255;
-				data[idx+1] = (gPhotonP[idx+1]+5.0)/10.0 * 255;
-				data[idx+2] = (gPhotonP[idx+2]+5.0)/10.0 * 255;
-				idx+=3;
+		
+		for (var i=0; i<gShapeNum+6; i++) {
+			for (var j=0; j<gPhotonP[i].length; j++) {
+				data[idx++] = (gPhotonP[i][j]+5.0)/10.0 * 255;
 			}
-		}
+		}		
+		if (data.length != gPhotonNum*3)
+			console.log("ERROR: photon count in texture.")
+			
 		gPTex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
 		gPTex.needsUpdate = true;
 	}
@@ -504,30 +524,67 @@ function createTextures() {
 	{
     var data = new Uint8Array(width*height*3);
 		var idx = 0;
-		for (var y=0; y<height; y++) {
-			for (var x=0; x<width; x++) {
-				data[idx  ] = (gPhotonI[idx  ]+1.0)/2.0 * 255;
-				data[idx+1] = (gPhotonI[idx+1]+1.0)/2.0 * 255;
-				data[idx+2] = (gPhotonI[idx+2]+1.0)/2.0 * 255;
-				idx+=3;
+		
+		for (var i=0; i<gShapeNum+6; i++) {
+			for (var j=0; j<gPhotonI[i].length; j++) {
+				data[idx++] = (gPhotonI[i][j]+1.0)/2.0 * 255;
 			}
-		}
+		}		
+		if (data.length != gPhotonNum*3)
+			console.log("ERROR: photon count in texture.")
+			
 		gITex = new THREE.DataTexture(data, width, height, THREE.RGBFormat);
 		gITex.needsUpdate = true;
 	}
 }
 
 function initShaderConsts() {
+	newCode = $("#shader-fs").text();
+	
+	// define constants
   var str =
     "/* SET CONSTANTS */\n" +
     "#define SHAPE_N " + gShapeNum + "\n" +
     "#define SHAPE_N_TI " + gShapeNumTi + "\n" +
     "#define PHOTON_N " + gPhotonNum + "\n" +
-    "#define PHOTON_EXPOS " + PHOTON_EXPOS + "\n" +
-    "\n";
+		"#define PHOTON_N_INV " + 1.0/gPhotonNum + "\n" +
+    "\n";		
+		
   console.log(str);
-  
-  $("#shader-fs").prepend(str)
+  newCode = str+newCode;
+	
+	var contribution_code =
+		'vec2 lookup = vec2((float(i)+0.5)*PHOTON_N_INV, 0.0);\n'+
+		'vec3 diff = getPhotonP(lookup)-p;\n'+
+		'float sqdist = dot(diff,diff);\n'+
+		'col += getPhotonC(lookup)\n'+
+		'  * max(0.0,-dot(norm, getPhotonI(lookup)))\n'+
+		'  * max(0.0, ALPHA*(1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));\n';
+	
+		
+	// write photon gather function
+	var code_str = "";
+	var start = 0;
+	for (var i=0; i<gPhotonP.length; i++) {
+		var currLen = gPhotonP[i].length/3;
+		var end = start+currLen;
+		
+		if (start<end) {
+			code_str +=
+				'if (idx == '+i+'){\n'+
+				'  for (int i='+start+'; i<'+end+'; i++) {\n'+
+						contribution_code+
+				'  }\n}\n\n';
+		}
+			
+		start += currLen;
+	}
+	
+	newCode = newCode.replace("/* PHOTON_GATHER_CODE_JS_INJECT */", code_str);
+	
+	$("#shader-fs").text(newCode);
+	
+	//console.log("shader offset: "+countLines(str)+" (+20)");
 }
 
 /* INIT GL */

@@ -166,7 +166,7 @@ vec3 uniformRandomDirectionNY() {
 // INTERSECTIONS 
 ////////////////////////////////////////////////////////////////////////////////
 
-vec3 computeLight(vec3 V, vec3 P, vec3 N, vec3 color) {
+vec3 computeLight(vec3 P, vec3 V, vec3 N, vec3 color) {
   vec3 L = normalize(uLightP-P);
   vec3 R = reflect(L, N);
   
@@ -205,6 +205,35 @@ bool intersectRoom(vec3 P, vec3 V,
 		else if (pos.y >  uRoomDim.y-EPS) { normal = vec3(0.0, -1.0, 0.0); color = vec3(0.5); }
 		else if (pos.z < -uRoomDim.z+EPS) { normal = vec3(0.0, 0.0,  1.0); color = vec3(0.5); }
 		else { normal = vec3(0.0, 0.0, -1.0); color = vec3(0.5); }
+    
+    return true;
+  }
+  
+  return false;
+}
+
+// indexed version
+bool intersectRoom(vec3 P, vec3 V,
+  out vec3 pos, out vec3 normal, out vec3 color, out int idx) {
+  
+  vec3 tMin = (-uRoomDim-P) / V;
+  vec3 tMax = (uRoomDim-P) / V;
+  vec3 t1 = min(tMin, tMax);
+  vec3 t2 = max(tMin, tMax);
+  float tNear = max(max(t1.x, t1.y), t1.z);
+  float tFar = min(min(t2.x, t2.y), t2.z);
+  
+  if (tNear<tFar && tFar>0.0) {
+    // take tFar, want back of box
+    
+    pos = P+tFar*V;
+    
+		if 			(pos.x < -uRoomDim.x+EPS) { normal = vec3( 1.0, 0.0, 0.0); idx = 0; color = vec3(1.0, 1.0, 0.0); }
+		else if (pos.x >  uRoomDim.x-EPS) { normal = vec3(-1.0, 0.0, 0.0); idx = 1; color = vec3(0.0, 0.0, 1.0); }
+		else if (pos.y < -uRoomDim.y+EPS) { normal = vec3(0.0,  1.0, 0.0); idx = 2; color = vec3(0.5); }
+		else if (pos.y >  uRoomDim.y-EPS) { normal = vec3(0.0, -1.0, 0.0); idx = 3; color = vec3(0.5); }
+		else if (pos.z < -uRoomDim.z+EPS) { normal = vec3(0.0, 0.0,  1.0); idx = 4; color = vec3(0.5); }
+		else { normal = vec3(0.0, 0.0, -1.0); idx = 5; color = vec3(0.5); }
     
     return true;
   }
@@ -271,12 +300,11 @@ bool intersectWorld(vec3 P, vec3 V,
     pos = P+V*t_min;
 		normal = getNormal(s, pos);
 		color = s.color;
+		idx += 6;		// offset 6 for room
     return true;
   }
   
-  idx = -1;
-  
-  return intersectRoom(P,V,pos,normal,color);
+  return intersectRoom(P,V,pos,normal,color,idx);
 }
 // check&indexed version
 bool intersectWorld(vec3 P, vec3 V, int idx) {  
@@ -297,16 +325,16 @@ vec4 raytrace(vec3 P, vec3 V) {
   vec3 p1, norm, p2;
   vec3 col, colT, colM, col3;
   if (intersectWorld(P, V, p1, norm, colT)) {
-    col = computeLight(V, p1, norm, colT);
+    col = computeLight(p1, V, norm, colT);
     colM = (colT + vec3(0.7)) / 1.7;
     
     V = reflect(V, norm);
     if (intersectWorld(p1+EPS*V, V, p2, norm, colT)) {
-      col += computeLight(V, p2, norm, colT) * colM;
+      col += computeLight(p2, V, norm, colT) * colM;
       colM *= (colT + vec3(0.7)) / 1.7;
       V = reflect(V, norm);
       if (intersectWorld(p2+EPS*V, V, p1, norm, colT)) {
-        col += computeLight(V, p1, norm, colT) * colM;
+        col += computeLight(p1, V, norm, colT) * colM;
       }
     }
   
@@ -325,7 +353,7 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
   if (intersectWorld(P, V, p1, norm, colT, idx)) {
     L = normalize(uLightP-p1);
     if (!intersectWorld(p1+EPS*L, L, idx))
-      col = computeLight(V, p1, norm, colT);
+      col = computeLight(p1, V, norm, colT);
     colM = (colT + vec3(0.7)) / 1.7;
     
 		/*
@@ -333,14 +361,14 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
     if (intersectWorld(p1+EPS*V, V, p2, norm, colT, idx)) {
       L = normalize(uLightP-p2);
       if (!intersectWorld(p2+EPS*L, L, idx))
-        col += computeLight(V, p2, norm, colT) * colM;
+        col += computeLight(p2, V, norm, colT) * colM;
       colM *= (colT + vec3(0.7)) / 1.7;
       
       V = reflect(V, norm);
       if (intersectWorld(p2+EPS*V, V, p1, norm, colT, idx)) {
         L = normalize(uLightP-p1);
         if (!intersectWorld(p1+EPS*L, L, idx))
-          col += computeLight(V, p1, norm, colT) * colM;
+          col += computeLight(p1, V, norm, colT) * colM;
       }      
     } */ 
   
@@ -363,18 +391,29 @@ vec3 getPhotonI(vec2 lookup) {
 	return texture2D(uITex, lookup).rgb * 2.0 - 1.0;
 }
 
+
 #define GATHER_SQRAD 8.0
 #define GATHER_RAD 2.8
 #define ALPHA 0.1918
 #define GAUSS_INNOM -.1440625
 #define GAUSS_DENOM .858152111
+
+vec3 gatherPhotons(vec3 p, vec3 norm, int idx) {
+	
+	vec3 col = vec3(0.0);
+	
+	/* PHOTON_GATHER_CODE_JS_INJECT */
+	
+	return col;
+}
+
 vec4 raytraceGather(vec3 P, vec3 V) {
   vec3 col = vec3(0.0);
   vec3 p, norm, coli;
   int idx;
   if (intersectWorld(P, V, p, norm, coli, idx)) {		
     for (int i=0; i<PHOTON_N; i++) {
-			vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
+			vec2 lookup = vec2((float(i)+0.5)*PHOTON_N_INV, 0.0);
 			vec3 diff = getPhotonP(lookup)-p;
 			float sqdist = dot(diff,diff);
 
@@ -387,43 +426,33 @@ vec4 raytraceGather(vec3 P, vec3 V) {
 }
 
 vec4 test(vec3 P, vec3 V) {  
-  vec3 col = vec3(0.0);
+  vec3 col;
   vec3 p, norm, coli;
   int idx;
-  if (intersectWorld(P, V, p, norm, coli, idx)) {
+  if (intersectWorld(P, V, p, norm, coli, idx)) {		
 		
-		if (idx != 0) {
-			for (int i=0; i<PHOTON_N; i++) {
-				vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-				vec3 diff = getPhotonP(lookup)-p;
-				float sqdist = dot(diff,diff);
-	
-				col += getPhotonC(lookup)
-					* max(0.0, -dot(norm, getPhotonI(lookup)))
-					* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
-			}
-		}
-		else {
-			// entering shape
-			V = refract(V, norm, 0.9);
-			P = p+EPS*V;
-			intersectWorld(P, V, p, norm, coli, idx);
-			// exiting shape
-			V = refract(V, -norm, 0.9);
-			P = p+EPS*V;
-			
-			if (intersectWorld(P, V, p, norm, coli, idx)) {
-			  for (int i=0; i<PHOTON_N; i++) {
-					vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-					vec3 diff = getPhotonP(lookup)-p;
-					float sqdist = dot(diff,diff);
+		//if (idx==6) {
+		//	vec3 Vi, Pi;
+		//	
+		//	Vi = reflect(V, norm);
+		//	Pi = p+EPS*Vi;
+		//	if (intersectWorld(Pi, Vi, p, norm, coli, idx)) {
+		//		col = gatherPhotons(p, norm, idx);
+		//	}
+		//	
+		//	//Vi = refract(V, norm, 0.9);
+		//	//Pi = p+EPS*V;
+		//	//intersectWorld(P, V, p, norm, coli, idx);
+		//	//Vi = refract(Vi, -norm, 0.9);
+		//	//Pi = p+EPS*Vi;
+		//	//if (intersectWorld(Pi, Vi, p, norm, coli, idx)) {
+		//	//	col = gatherPhotons(p, norm, idx);
+		//	//}
+		//}
+		//
+		//if (idx!=6)
 		
-					col += getPhotonC(lookup)
-						* max(0.0, -dot(norm, getPhotonI(lookup)))
-						* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
-				}
-			}
-		}
+			col = gatherPhotons(p, norm, idx);
 	}
 	return vec4(col, 1.0);
 }
@@ -570,10 +599,15 @@ void main(void)
 	gl_FragColor = test(uCamPos, R1);
   //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);
 	
-	//if (vUv.y < 0.5)
+	//if (Ks < 0.0)
+	//	gl_FragColor = raytraceGather(uCamPos, R1);
+		
+	//if (vUv.y < 0.4)
 	//	gl_FragColor = vec4(getPhotonC(vUv), 1.0);
-	//else
+	//else if (vUv.y < 0.7)
 	//	gl_FragColor = vec4(getPhotonP(vUv), 1.0);
+	//else
+	//	gl_FragColor = vec4(getPhotonI(vUv), 1.0);
 
 	//gl_FragColor = mix(
 	//	raytraceShadow(uCamPos, R1),
