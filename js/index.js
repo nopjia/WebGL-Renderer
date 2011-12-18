@@ -9,7 +9,7 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var PHOTON_INIT_N = 100;
+var PHOTON_INIT_N = 50;
 var PHOTON_DEPTH = 1;
 
 var container;
@@ -444,25 +444,26 @@ function initScene() {
 }
 
 function addPhotons() {
-  for (var i=0; i<gPhotonP.length; i+=3) {
-    var col = new THREE.Color();
-		col.setRGB(gPhotonC[i], gPhotonC[i+1], gPhotonC[i+2]);
-    
-    var material = new THREE.LineBasicMaterial( {
-      color: col.getHex(),
-      opacity: 1,
-      linewidth: 2
-    } );
-      
-    var v1 = new THREE.Vector3(gPhotonP[i], gPhotonP[i+1], gPhotonP[i+2]);
-    var v2 = v1.clone().subSelf(new THREE.Vector3(gPhotonI[i], gPhotonI[i+1], gPhotonI[i+2]));
-		var geometry = new THREE.Geometry();
-    geometry.vertices.push(new THREE.Vertex(v1));
-    geometry.vertices.push(new THREE.Vertex(v2));
-    
-    var line = new THREE.Line( geometry, material, THREE.LinePieces );
-		gScene2.add( line );
-  }
+	for (var j=0; j<gPhotonP.length; j++)
+		for (var i=0; i<gPhotonP[j].length; i+=3) {
+			var col = new THREE.Color();
+			col.setRGB(gPhotonC[j][i], gPhotonC[j][i+1], gPhotonC[j][i+2]);
+			
+			var material = new THREE.LineBasicMaterial( {
+				color: col.getHex(),
+				opacity: 1,
+				linewidth: 2
+			} );
+				
+			var v1 = new THREE.Vector3(gPhotonP[j][i], gPhotonP[j][i+1], gPhotonP[j][i+2]);
+			var v2 = v1.clone().subSelf(new THREE.Vector3(gPhotonI[j][i], gPhotonI[j][i+1], gPhotonI[j][i+2]));
+			var geometry = new THREE.Geometry();
+			geometry.vertices.push(new THREE.Vertex(v1));
+			geometry.vertices.push(new THREE.Vertex(v2));
+			
+			var line = new THREE.Line( geometry, material, THREE.LinePieces );
+			gScene2.add( line );
+		}
   
   //addParticleSystem();
 }

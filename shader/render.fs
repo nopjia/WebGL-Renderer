@@ -118,7 +118,7 @@ const float SPEC = 30.0;
 const float REFL = 0.5;
 const float Ka = 0.2;
 const float Kt = 0.9;
-const float Kr = 0.2;
+const float Kr = 0.8;
 float Ks, Kd;
 
 Shape shapes[SHAPE_N];
@@ -306,7 +306,7 @@ bool intersectWorld(vec3 P, vec3 V,
   
   return intersectRoom(P,V,pos,normal,color,idx);
 }
-// check&indexed version
+// check & indexed version
 bool intersectWorld(vec3 P, vec3 V, int idx) {  
   float t;
   for (int i=0; i<SHAPE_N; i++) {
@@ -379,6 +379,14 @@ vec4 raytraceShadow(vec3 P, vec3 V) {
   }
 }
 
+vec4 raytraceCheck(vec3 P, vec3 V) {
+  return intersectWorld(P,V) ? vec4(1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PHOTON GATHER
+////////////////////////////////////////////////////////////////////////////////
+
 vec3 getPhotonC(vec2 lookup) {
 	return texture2D(uCTex, lookup).rgb;
 }
@@ -390,7 +398,6 @@ vec3 getPhotonP(vec2 lookup) {
 vec3 getPhotonI(vec2 lookup) {
 	return texture2D(uITex, lookup).rgb * 2.0 - 1.0;
 }
-
 
 #define GATHER_SQRAD 8.0
 #define GATHER_RAD 2.8
@@ -426,33 +433,43 @@ vec4 raytraceGather(vec3 P, vec3 V) {
 }
 
 vec4 test(vec3 P, vec3 V) {  
-  vec3 col;
+  vec3 col = vec3(0.0);
   vec3 p, norm, coli;
   int idx;
-  if (intersectWorld(P, V, p, norm, coli, idx)) {		
+  if (intersectWorld(P, V, p, norm, coli, idx)) {
 		
-		//if (idx==6) {
-		//	vec3 Vi, Pi;
-		//	
-		//	Vi = reflect(V, norm);
-		//	Pi = p+EPS*Vi;
-		//	if (intersectWorld(Pi, Vi, p, norm, coli, idx)) {
-		//		col = gatherPhotons(p, norm, idx);
-		//	}
-		//	
-		//	//Vi = refract(V, norm, 0.9);
-		//	//Pi = p+EPS*V;
-		//	//intersectWorld(P, V, p, norm, coli, idx);
-		//	//Vi = refract(Vi, -norm, 0.9);
-		//	//Pi = p+EPS*Vi;
-		//	//if (intersectWorld(Pi, Vi, p, norm, coli, idx)) {
-		//	//	col = gatherPhotons(p, norm, idx);
-		//	//}
-		//}
-		//
-		//if (idx!=6)
+		vec3 L = normalize(uLightP-p);
+				
+		if (idx==6) {
+			vec3 Vi, Pi, pi, ni;
+			int idxi;
+						
+			Vi = reflect(V, norm);
+			Pi = p+EPS*Vi;
+			if (intersectWorld(Pi, Vi, pi, ni, coli, idxi)) {
+				col += 0.3*gatherPhotons(pi, ni, idxi);
+			}
+			
+			Vi = refract(V, norm, 0.8);
+			Pi = p+EPS*Vi;
+			intersectWorld(Pi, Vi, pi, ni, coli, idxi);
+			Vi = refract(Vi, -ni, 0.8);
+			Pi = pi+EPS*Vi;
+			if (intersectWorld(Pi, Vi, pi, ni, coli, idxi)) {
+				col += 0.7*gatherPhotons(pi, ni, idxi);
+			}
+			
+			// add specular
+			vec3 R = reflect(L, norm);
+			col += 0.5*pow(max(dot(R, V), 0.0), SPEC);
+		}
 		
-			col = gatherPhotons(p, norm, idx);
+		if (idx!=6)		
+			col += gatherPhotons(p, norm, idx);		
+		
+		// add shadow
+    if (intersectWorld(p+EPS*L, L, idx-6))
+			col *= 0.3;
 	}
 	return vec4(col, 1.0);
 }
@@ -460,108 +477,6 @@ vec4 test(vec3 P, vec3 V) {
 #undef BETA
 #undef GAUSS_INNOM
 #undef GAUSS_DENOM
-
-// REFLECTION VERSION
-//vec4 test(vec3 P, vec3 V) {  
-//  vec3 col = vec3(0.0);
-//  vec3 p, norm, coli;
-//  int idx;
-//  if (intersectWorld(P, V, p, norm, coli, idx)) {
-//		
-//    if (idx != 0) {
-//      for (int i=0; i<PHOTON_N; i++) {
-//        vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-//        vec3 dist = getPhotonP(lookup)-p;
-//        float sqdist = dot(dist,dist);
-//        
-//        if (sqdist<GATHER_SQRAD) {				
-//          col += getPhotonC(lookup)
-//            * max(0.0, -dot(norm, getPhotonI(lookup)))
-//            * (GATHER_SQRAD-sqdist) / (GATHER_SQRAD*PHOTON_EXPOS);
-//        }
-//      }
-//    }
-//    else {
-//      V = reflect(V, norm);
-//      P = p+EPS*V;
-//      if (intersectWorld(P, V, p, norm, coli, idx)) {
-//        for (int i=0; i<PHOTON_N; i++) {
-//          vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-//          vec3 dist = getPhotonP(lookup)-p;
-//          float sqdist = dot(dist,dist);
-//          
-//          if (sqdist<GATHER_SQRAD) {				
-//            col += getPhotonC(lookup)
-//              * max(0.0, -dot(norm, getPhotonI(lookup)))
-//              * (GATHER_SQRAD-sqdist) / (GATHER_SQRAD*PHOTON_EXPOS);
-//          }
-//        }
-//      }
-//    }
-//	}
-//	return vec4(col, 1.0);
-//}
-// REFRACTION VERSION
-//vec4 test(vec3 P, vec3 V) {  
-//  vec3 col = vec3(0.0);
-//  vec3 p, norm, coli;
-//  int idx;
-//  if (intersectWorld(P, V, p, norm, coli, idx)) {
-//		
-//		if (idx != 0) {
-//			for (int i=0; i<PHOTON_N; i++) {
-//				vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-//				vec3 diff = getPhotonP(lookup)-p;
-//				float sqdist = dot(diff,diff);
-//	
-//				col += getPhotonC(lookup)
-//					* max(0.0, -dot(norm, getPhotonI(lookup)))
-//					* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
-//			}
-//		}
-//		else {
-//			// outer shell
-//			V = refract(V, norm, 0.9);
-//			P = p+EPS*V;
-//			intersectWorld(P, V, p, norm, coli, idx);
-//			V = refract(V, -norm, 0.9);
-//			P = p+EPS*V;
-//			
-//			if (intersectWorld(P, V, p, norm, coli, idx)) {
-//			  for (int i=0; i<PHOTON_N; i++) {
-//					vec2 lookup = vec2((float(i)+0.5)/float(PHOTON_N), 0.0);
-//					vec3 diff = getPhotonP(lookup)-p;
-//					float sqdist = dot(diff,diff);
-//		
-//					col += getPhotonC(lookup)
-//						* max(0.0, -dot(norm, getPhotonI(lookup)))
-//						* max(0.0, ALPHA*( 1.0-(1.0-exp(GAUSS_INNOM*sqdist))/GAUSS_DENOM ));
-//				}
-//			}
-//		}
-//	}
-//	return vec4(col, 1.0);
-//}
-
-//vec4 raytracePhotons(vec3 P, vec3 V) {
-//  bool hit = false;
-//	float t;
-//	vec3 p,c;
-//  for (int i=0; i<PHOTON_N; i++) {
-//    t = dot((uPhotonP[i]-P),V);
-//    p = P+V*t;
-//		vec3 dist = uPhotonP[i]-p;
-//    if (dot(dist,dist)<.01) {
-//      hit = true;
-//			c = uPhotonC[i];
-//    }
-//  }
-//  return hit ? vec4(c, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
-//}
-
-vec4 raytraceCheck(vec3 P, vec3 V) {
-  return intersectWorld(P,V) ? vec4(1.0) : vec4(0.0, 0.0, 0.0, 1.0);
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // MAIN 
@@ -594,7 +509,6 @@ void main(void)
   
   //gl_FragColor = raytrace(uCamPos, R1);
   //gl_FragColor = raytraceShadow(uCamPos, R1);
-  //gl_FragColor = raytracePhotons(uCamPos, R1);
   //gl_FragColor = raytraceGather(uCamPos, R1);
 	gl_FragColor = test(uCamPos, R1);
   //gl_FragColor = vec4(0.9, 0.0, 0.9, 1.0);
