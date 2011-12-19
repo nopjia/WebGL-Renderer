@@ -402,6 +402,8 @@ vec3 getPhotonI(vec2 lookup) {
 #define GATHER_SQRAD 8.0
 #define GATHER_RAD 2.8
 #define ALPHA 0.1918
+#define BETA 1.953
+// precomputed from Gaussian formula
 #define GAUSS_INNOM -.1440625
 #define GAUSS_DENOM .858152111
 
@@ -440,31 +442,31 @@ vec4 test(vec3 P, vec3 V) {
 		
 		vec3 L = normalize(uLightP-p);
 				
-		if (idx==6) {
-			vec3 Vi, Pi, pi, ni;
-			int idxi;
-						
-			Vi = reflect(V, norm);
-			Pi = p+EPS*Vi;
-			if (intersectWorld(Pi, Vi, pi, ni, coli, idxi)) {
-				col += 0.3*gatherPhotons(pi, ni, idxi);
-			}
-			
-			Vi = refract(V, norm, 0.8);
-			Pi = p+EPS*Vi;
-			intersectWorld(Pi, Vi, pi, ni, coli, idxi);
-			Vi = refract(Vi, -ni, 0.8);
-			Pi = pi+EPS*Vi;
-			if (intersectWorld(Pi, Vi, pi, ni, coli, idxi)) {
-				col += 0.7*gatherPhotons(pi, ni, idxi);
-			}
-			
-			// add specular
-			vec3 R = reflect(L, norm);
-			col += 0.5*pow(max(dot(R, V), 0.0), SPEC);
-		}
-		
-		if (idx!=6)		
+		//if (idx==6) {
+		//	vec3 Vi, Pi, pi, ni;
+		//	int idxi;
+		//				
+		//	Vi = reflect(V, norm);
+		//	Pi = p+EPS*Vi;
+		//	if (intersectWorld(Pi, Vi, pi, ni, coli, idxi)) {
+		//		col += 0.3*gatherPhotons(pi, ni, idxi);
+		//	}
+		//	
+		//	Vi = refract(V, norm, 0.8);
+		//	Pi = p+EPS*Vi;
+		//	intersectWorld(Pi, Vi, pi, ni, coli, idxi);
+		//	Vi = refract(Vi, -ni, 0.8);
+		//	Pi = pi+EPS*Vi;
+		//	if (intersectWorld(Pi, Vi, pi, ni, coli, idxi)) {
+		//		col += 0.7*gatherPhotons(pi, ni, idxi);
+		//	}
+		//	
+		//	// add specular
+		//	vec3 R = reflect(L, norm);
+		//	col += 0.5*pow(max(dot(R, V), 0.0), SPEC);
+		//}
+		//
+		//if (idx!=6)		
 			col += gatherPhotons(p, norm, idx);		
 		
 		// add shadow

@@ -9,8 +9,8 @@ var EPS = 0.0001,
 var WIDTH = 400,
     HEIGHT = 400;
     
-var PHOTON_INIT_N = 50;
-var PHOTON_DEPTH = 1;
+var PHOTON_INIT_N = 120;
+var PHOTON_DEPTH = 2;
 
 var container;
 var gRenderer, gStats;
@@ -358,31 +358,34 @@ function scatterPhotons() {
   }
 }
 
-//function castPhoton(P, V, col, depth) {
-//	if (depth<PHOTON_DEPTH && intersectWorld(P,V)) {
-//    gPhotonNum++;
-//        
-//		// store current photon
-//    gPhotonP.push(gPos.x, gPos.y, gPos.z);
-//    gPhotonI.push(V.x, V.y, V.z);
-//    gPhotonC.push(col.x, col.y, col.z);
-//    
-//    // russian roulette
-//    // col = incident photon color
-//    // gCol = diffuse refl coeffs
-//    var colTop = gCol.clone().multiplySelf(col);
-//    var prob = max3(colTop.x, colTop.y, colTop.z) / max3(col.x, col.y, col.z);
-//    
-//    if (Math.random() < prob) {    
-//    	V = reflectVector3(V, gN);
-//      col.multiplySelf(gCol).multiplyScalar(prob);
-//    	castPhoton(gPos.addSelf(V.clone().multiplyScalar(EPS)), V, col, depth+1);
-//    }
-//	}
-//}
+function castPhoton(P, V, col, depth) {
+	if (depth<PHOTON_DEPTH && intersectWorld(P,V)) {
+    gPhotonNum++;
+        
+		
+    
+    // russian roulette
+    // col = incident photon color
+    // gCol = diffuse refl coeffs
+    var colTop = gCol.clone().multiplySelf(col);
+    var prob = max3(colTop.x, colTop.y, colTop.z) / max3(col.x, col.y, col.z);
+		
+		col.multiplySelf(gCol).multiplyScalar(prob);
+		
+		// store photon
+    gPhotonP[gI].push(gPos.x, gPos.y, gPos.z);
+    gPhotonI[gI].push(V.x, V.y, V.z);
+    gPhotonC[gI].push(col.x, col.y, col.z);
+    
+    if (Math.random() < prob) {    
+    	V = reflectVector3(V, gN);      
+    	castPhoton(gPos.addSelf(V.clone().multiplyScalar(EPS)), V, col, depth+1);
+    }
+	}
+}
 
 // ga_tech style
-function castPhoton(P, V, col, depth) {  
+function castPhoton1(P, V, col, depth) {  
   if (depth<PHOTON_DEPTH && intersectWorld(P,V)) {
     gPhotonNum++;
     
